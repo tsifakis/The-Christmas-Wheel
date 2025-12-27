@@ -1,5 +1,5 @@
-            Ο Τροχός των Χριστουγέννων 2060 🎄✨
- “A creation by Taxiarchis with the help of his dad and ChatGPT”
+Ο Τροχός των Χριστουγέννων 2060 🎄✨
+A creation by Taxiarchis with the help of his dad and ChatGPT
 
 Pygame παιχνίδι τύπου “Τροχός της Τύχης” με:
 - 3 παίκτες
