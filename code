@@ -268,19 +268,19 @@ class Game:
         label, value = WHEEL_SLICES[idx]
         self.last_spin = (label, value)
         if value == "LOSE_TURN":
-            self.message = "❌ ΧΑΝΕΙΣ ΣΕΙΡΑ!"
+            self.message = " ΧΑΝΕΙΣ ΣΕΙΡΑ!"
             self.next_turn()
             return
         if value == "BANKRUPT":
             self.current_player()["score"] = 0
-            self.message = "💥 ΧΡΕΩΚΟΠΙΑ! ΜΗΔΕΝΙΣΜΟΣ ΣΚΟΡ! Πας στον επόμενο."
+            self.message = " ΧΡΕΩΚΟΠΙΑ! ΜΗΔΕΝΙΣΜΟΣ ΣΚΟΡ! Πας στον επόμενο."
             self.next_turn()
             return
         if value == "BONUS":
-            self.message = "✨ BONUS! Διάλεξε γράμμα (A-Z) ή λύσε (ENTER)."
+            self.message = " BONUS! Διάλεξε γράμμα (A-Z) ή λύσε (ENTER)."
             self.phase = "ACTION"
             return
-        self.message = f"🎯 Έπεσες σε {value} πόντους. Διάλεξε ΣΥΜΦΩΝΟ (B-Z) ή λύσε (ENTER)."
+        self.message = f" Έπεσες σε {value} πόντους. Διάλεξε ΣΥΜΦΩΝΟ (B-Z) ή λύσε (ENTER)."
         self.phase = "ACTION"
 
     def update(self, dt):
@@ -305,7 +305,7 @@ class Game:
         self.used_letters.add(letter)
         count = self.word.count(letter)
         if count == 0:
-            self.message = f"❌ Δεν υπάρχει το {letter}. Πας στον επόμενο."
+            self.message = f" Δεν υπάρχει το {letter}. Πας στον επόμενο."
             self.next_turn()
             return
         if self.last_spin and self.last_spin[1] == "BONUS":
@@ -317,10 +317,10 @@ class Game:
         self.guessed.add(letter)
         if all_revealed(self.word, self.guessed):
             self.current_player()["score"] += WIN_BONUS
-            self.message = f"🏆 ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
+            self.message = f"ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
             self.phase = "END"
             return
-        self.message = f"✅ Υπάρχει {count} φορά(ές) το {letter}! +{gained} πόντοι. Συνέχισε ή λύσε (ENTER)."
+        self.message = f" Υπάρχει {count} φορά(ές) το {letter}! +{gained} πόντοι. Συνέχισε ή λύσε (ENTER)."
 
     def buy_vowel(self):
         if self.phase != "ACTION" or self.solve_mode:
@@ -330,7 +330,7 @@ class Game:
             self.message = f"Δεν έχεις αρκετούς πόντους (χρειάζεσαι {VOWEL_COST})."
             return
         self.await_vowel = True
-        self.message = "🔤 Αγορά φωνήεντος: γράψε A / E / I / O / U / Y."
+        self.message = " Αγορά φωνήεντος: γράψε A / E / I / O / U / Y."
 
     def guess_vowel(self, letter):
         if self.phase != "ACTION" or not self.await_vowel or self.solve_mode:
@@ -351,16 +351,16 @@ class Game:
         count = self.word.count(letter)
         self.await_vowel = False
         if count == 0:
-            self.message = f"❌ Δεν υπάρχει το {letter}. -{VOWEL_COST} πόντοι και πας στον επόμενο."
+            self.message = f" Δεν υπάρχει το {letter}. -{VOWEL_COST} πόντοι και πας στον επόμενο."
             self.next_turn()
             return
         self.guessed.add(letter)
         if all_revealed(self.word, self.guessed):
             p["score"] += WIN_BONUS
-            self.message = f"🏆 ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
+            self.message = f"ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
             self.phase = "END"
             return
-        self.message = f"✅ Υπάρχει {count} φορά(ές) το {letter}! (αγορά -{VOWEL_COST}). Συνέχισε!"
+        self.message = f" Υπάρχει {count} φορά(ές) το {letter}! (αγορά -{VOWEL_COST}). Συνέχισε!"
 
     def start_solve(self):
         if self.phase != "ACTION":
@@ -368,7 +368,7 @@ class Game:
         self.solve_mode = True
         self.solve_text = ""
         self.await_vowel = False
-        self.message = "✍️ Γράψε τη λύση και πάτα ENTER (ESC για ακύρωση)."
+        self.message = "Γράψε τη λύση και πάτα ENTER (ESC για ακύρωση)."
 
     def submit_solve(self):
         if not self.solve_mode:
@@ -379,10 +379,10 @@ class Game:
 
         if attempt == target:
             self.current_player()["score"] += WIN_BONUS
-            self.message = f"🏆 ΣΩΣΤΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
+            self.message = f"ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
             self.phase = "END"
         else:
-            self.message = f"❌ ΛΑΘΟΣ! Η σωστή λέξη ήταν: {self.word}. Πας στον επόμενο."
+            self.message = f" ΛΑΘΟΣ! Η σωστή λέξη ήταν: {self.word}. Πας στον επόμενο."
             self.next_turn()
 
     def cancel_solve(self):
@@ -411,7 +411,7 @@ def main():
     try:
         bg_image = pygame.image.load(BG_PATH).convert()
     except Exception as e:
-        print("❌ Δεν μπόρεσα να φορτώσω την εικόνα:", BG_PATH)
+        print("Δεν μπόρεσα να φορτώσω την εικόνα:", BG_PATH)
         print("Σφάλμα:", e)
         pygame.quit()
         return
@@ -420,7 +420,7 @@ def main():
     try:
         final_image = pygame.image.load(FINAL_IMAGE_PATH).convert_alpha()
     except Exception as e:
-        print("❌ Δεν μπόρεσα να φορτώσω την τελική εικόνα:", FINAL_IMAGE_PATH)
+        print("Δεν μπόρεσα να φορτώσω την τελική εικόνα:", FINAL_IMAGE_PATH)
         print("Σφάλμα:", e)
         final_image = None
     clock = pygame.time.Clock()
@@ -724,4 +724,3 @@ if __name__ == "__main__":
     main()
 
 
-❌
