@@ -1,726 +1,844 @@
-import math
-import random
-import pygame
-import os
+import math  # Βιβλιοθήκη μαθηματικών (γωνίες, ημίτονο/συνημίτονο, π)
+import random  # Βιβλιοθήκη τυχαιότητας (τυχαία λέξη, τυχαίες τιμές)
+import pygame  # Βιβλιοθήκη για παιχνίδια (παράθυρο, γραφικά, ήχος, events)
+import os  # Βιβλιοθήκη λειτουργικού (διαδρομές, καθάρισμα κονσόλας κ.λπ.)
 
-os.system('cls' if os.name == 'nt' else 'clear')
-BG_PATH = r"C:\Users\tsifa\Desktop\V.S Code\taxiarchis\1.jpg"
-FINAL_IMAGE_PATH = r"C:\Users\tsifa\Desktop\V.S Code\taxiarchis\taxiarchis.png"
-FPS = 60
+os.system('cls' if os.name == 'nt' else 'clear')  # Καθαρίζει την κονσόλα (Windows: cls, αλλιώς: clear)
 
-WORDS = [
-    "PYTHON", "JAVASCRIPT", "VARIABLE", "FUNCTION", "ALGORITHMICS",
-    "KEYBOARD", "PROCESS", "MEMORY", "POINTER", "MOUSE", "COMPUTER"]
+BG_PATH = r"C:\Users\tsifa\Desktop\V.S Code\taxiarchis\1.png"  # Διαδρομή αρχείου εικόνας φόντου
+FINAL_IMAGE_PATH = r"C:\Users\tsifa\Desktop\V.S Code\taxiarchis\taxiarchis.png"  # Διαδρομή τελικής εικόνας (μετά το τέλος)
+SPIN_SOUND_PATH = r"C:\Users\tsifa\Desktop\V.S Code\taxiarchis\christmas_spin.wav"  # Διαδρομή ήχου που παίζει όταν γυρνάει ο τροχός
+FPS = 60  # Πόσα καρέ ανά δευτερόλεπτο (ομαλότητα κίνησης)
 
-VOWELS = set("A E I O U Y")
+WORDS = [  # Λίστα με πιθανές λέξεις που θα μαντεύουν οι παίκτες
+    "PYTHON", "JAVASCRIPT", "VARIABLE", "FUNCTION", "ALGORITHMICS",  # Λέξεις σχετικές με προγραμματισμό
+    "KEYBOARD", "PROCESS", "MEMORY", "POINTER", "MOUSE", "COMPUTER"  # Ακόμα λέξεις σχετικές με υπολογιστές
+]
 
-WHEEL_SLICES = [
-    ("ΛΑΜΠΑΚΙΑ", 100),
-    ("ΜΠΑΛΛΕΣ", 200),
-    ("ΧΑΝΕΙΣ ΣΕΙΡΑ", "LOSE_TURN"),
-    ("ΔΕΝΔΡΟ", 300),
-    ("ΣΤΟΛΙΔΙΑ", 400),
-    ("BONUS", "BONUS"),
-    ("ΧΙΟΝΙ", 500),
-    ("ΑΣΤΕΡΙΑ", 600),
-    ("ΦΑΤΝΗ", 700),
-    ("ΧΡΕΩΚΟΠΙΑ", "BANKRUPT"),]
+VOWELS = set("A E I O U Y")  # Σύνολο φωνηέντων (για γρήγορο έλεγχο αν ένα γράμμα είναι φωνήεν)
 
-VOWEL_COST = 100
-WIN_BONUS = 1000
-GOLD = (255, 215, 0)
-BLACK = (0, 0, 0)
-SNOW_WHITE = (245, 245, 255)
-NEON_CYAN = (120, 240, 255)
-NEON_PURPLE = (210, 140, 255)
+WHEEL_SLICES = [  # Φέτες τροχού: (ετικέτα, πόντοι) ή (ετικέτα, ειδική εντολή)
+    ("LIGHTS", 100),  # Αν σταματήσει εδώ, η αξία είναι 100 πόντοι
+    ("ORNAMENTS", 200),  # 200 πόντοι
+    ("LOSE A TURN", "LOSE_TURN"),  # Ειδικό: χάνει σειρά
+    ("TREE", 300),  # 300 πόντοι
+    ("DECORATIONS", 400),  # 400 πόντοι
+    ("BONUS", "BONUS"),  # Ειδικό: bonus κανόνες
+    ("SNOW", 500),  # 500 πόντοι
+    ("STARS", 600),  # 600 πόντοι
+    ("MANGER", 700),  # 700 πόντοι
+    ("BANKRUPT", "BANKRUPT"),  # Ειδικό: μηδενίζει σκορ
+]
 
-def lerp(a, b, t):
-    return a + (b - a) * t
+VOWEL_COST = 100  # Πόσο κοστίζει να “αγοράσεις” ένα φωνήεν (αφαιρείται από σκορ)
+WIN_BONUS = 1000  # Bonus πόντοι όταν λυθεί όλη η λέξη
 
-def lerp_color(c1, c2, t):
-    return (
-        int(lerp(c1[0], c2[0], t)),
-        int(lerp(c1[1], c2[1], t)),
-        int(lerp(c1[2], c2[2], t)),)
+GOLD = (255, 215, 0)  # Χρυσό χρώμα (RGB)
+BLACK = (0, 0, 0)  # Μαύρο χρώμα (RGB)
+SNOW_WHITE = (245, 245, 255)  # Λευκό χιονιού (RGB)
+NEON_CYAN = (120, 240, 255)  # Neon κυανό (RGB)
+NEON_PURPLE = (210, 140, 255)  # Neon μωβ (RGB)
 
-NEON_TITLE_COLORS = [
-    (120, 240, 255),  
-    (210, 140, 255),  
-    (255, 90, 190),   
-    (255, 170, 90),]
+def lerp(a, b, t):  # Συνάρτηση για γραμμική παρεμβολή (ανάμειξη) δύο αριθμών
+    return a + (b - a) * t  # Επιστρέφει τιμή ανάμεσα σε a και b ανάλογα με το t (0..1)
 
-def neon_cycle_color(t, speed=0.75):
-    n = len(NEON_TITLE_COLORS)
-    x = (t * speed) % n
-    i = int(x)
-    f = x - i
-    c1 = NEON_TITLE_COLORS[i]
-    c2 = NEON_TITLE_COLORS[(i + 1) % n]
-    return lerp_color(c1, c2, f)
+def lerp_color(c1, c2, t):  # Συνάρτηση για ανάμειξη δύο χρωμάτων (RGB)
+    return (  # Θα επιστρέψουμε ένα νέο χρώμα (R, G, B)
+        int(lerp(c1[0], c2[0], t)),  # Ανάμειξη κόκκινου καναλιού
+        int(lerp(c1[1], c2[1], t)),  # Ανάμειξη πράσινου καναλιού
+        int(lerp(c1[2], c2[2], t)),  # Ανάμειξη μπλε καναλιού
+    )  # Τέλος επιστροφής tuple χρώματος
 
-def draw_neon_text_center(surface, text, font, cx, cy, t):
-    base = neon_cycle_color(t, speed=0.75)
-    pulse = 0.5 + 0.5 * math.sin(t * 3.0)
-    glow_a = int(70 + 130 * pulse)
-    out_a = int(60 + 90 * (1 - pulse))
-    img = font.render(text, True, base)
-    rect = img.get_rect(center=(cx, cy))
-    glow = font.render(text, True, base).convert_alpha()
-    glow.set_alpha(glow_a)
-    for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, 2), (-2, 2), (2, -2)]:
-        surface.blit(glow, (rect.x + dx, rect.y + dy))
-    outline = font.render(text, True, (10, 10, 10)).convert_alpha()
-    outline.set_alpha(out_a)
-    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-        surface.blit(outline, (rect.x + dx, rect.y + dy))
-    surface.blit(img, rect.topleft)
-    return rect
+NEON_TITLE_COLORS = [  # Λίστα χρωμάτων που θα “κυκλώνουν” για neon τίτλο
+    (120, 240, 255),  # cyan
+    (210, 140, 255),  # purple
+    (255, 90, 190),  # pink
+    (255, 170, 90),  # orange
+]
 
-def mask_word(word, guessed):
-    return " ".join([ch if ch in guessed else "_" for ch in word])
+def neon_cycle_color(t, speed=0.75):  # Επιλέγει χρώμα neon ανάλογα με τον χρόνο t
+    n = len(NEON_TITLE_COLORS)  # Πλήθος διαθέσιμων neon χρωμάτων
+    x = (t * speed) % n  # Θέση στο “κύκλο” των χρωμάτων
+    i = int(x)  # Δείκτης τρέχοντος χρώματος
+    f = x - i  # Κλάσμα μετάβασης προς το επόμενο χρώμα
+    c1 = NEON_TITLE_COLORS[i]  # Τρέχον χρώμα
+    c2 = NEON_TITLE_COLORS[(i + 1) % n]  # Επόμενο χρώμα (κυκλικά)
+    return lerp_color(c1, c2, f)  # Επιστρέφει ενδιάμεσο “αναμεμειγμένο” χρώμα
 
-def all_revealed(word, guessed):
-    return all(ch in guessed for ch in word)
+def draw_neon_text_center(surface, text, font, cx, cy, t):  # Ζωγραφίζει neon κείμενο στο κέντρο
+    base = neon_cycle_color(t, speed=0.75)  # Υπολογίζει βασικό neon χρώμα που αλλάζει με τον χρόνο
+    pulse = 0.5 + 0.5 * math.sin(t * 3.0)  # Παλμός 0..1 για “αναβοσβήσιμο” εφέ
+    glow_a = int(70 + 130 * pulse)  # Διαφάνεια του glow (λάμψης)
+    out_a = int(60 + 90 * (1 - pulse))  # Διαφάνεια του outline (περιγράμματος)
 
-def angle_norm(a):
-    twopi = 2 * math.pi
-    a = a % twopi
-    if a < 0:
-        a += twopi
-    return a
+    img = font.render(text, True, base)  # Φτιάχνει το κείμενο σαν εικόνα με antialias και χρώμα base
+    rect = img.get_rect(center=(cx, cy))  # Τοποθετεί το κείμενο στο κέντρο (cx, cy)
 
-def pick_wheel_result(rotation, n_slices, pointer_angle=-math.pi / 2):
-    slice_angle = 2 * math.pi / n_slices
-    wheel_angle = angle_norm(pointer_angle - rotation)
-    idx = int(wheel_angle // slice_angle)
-    return idx
+    glow = font.render(text, True, base).convert_alpha()  # Δημιουργεί άλλη εικόνα κειμένου για glow
+    glow.set_alpha(glow_a)  # Ρυθμίζει διαφάνεια glow ώστε να “αναπνέει”
 
-def wrap_letters(letters, max_per_line=14):
-    if not letters:
-        return ["-"]
-    parts = list(sorted(letters))
-    lines, line = [], []
-    for p in parts:
-        line.append(p)
-        if len(line) >= max_per_line:
-            lines.append(" ".join(line))
-            line = []
-    if line:
-        lines.append(" ".join(line))
-    return lines
+    for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, 2), (-2, 2), (2, -2)]:  # Μικρές μετατοπίσεις
+        surface.blit(glow, (rect.x + dx, rect.y + dy))  # Ζωγραφίζει glow γύρω από το κείμενο
 
-def draw_gold_text(surface, text, font, x, y, color=GOLD):
-    shadow_img = font.render(text, True, (0, 0, 0))
-    surface.blit(shadow_img, (x + 2, y + 2))
-    outline_img = font.render(text, True, (20, 20, 20))
-    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-        surface.blit(outline_img, (x + dx, y + dy))
-    img = font.render(text, True, color)
-    surface.blit(img, (x, y))
-    return img.get_rect(topleft=(x, y))
+    outline = font.render(text, True, (10, 10, 10)).convert_alpha()  # Φτιάχνει σκούρο outline layer
+    outline.set_alpha(out_a)  # Θέτει διαφάνεια outline
 
-def draw_gold_text_center(surface, text, font, cx, cy, color=GOLD):
-    img = font.render(text, True, color)
-    rect = img.get_rect(center=(cx, cy))
-    draw_gold_text(surface, text, font, rect.x, rect.y, color)
-    return rect
+    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:  # Μικρές μετατοπίσεις για outline
+        surface.blit(outline, (rect.x + dx, rect.y + dy))  # Ζωγραφίζει outline γύρω
 
-def make_rounded_mask(size, radius):
-    mask = pygame.Surface(size, pygame.SRCALPHA)
-    pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=radius)
-    return mask
+    surface.blit(img, rect.topleft)  # Ζωγραφίζει το “κανονικό” κείμενο από πάνω
+    return rect  # Επιστρέφει το rect του κειμένου (χρήσιμο αν θέλουμε collision ή θέση)
 
-def draw_image_panel(screen, bg_image, rect, alpha=130, radius=18, border_color=(245, 245, 245), border_w=2):
-    screen_rect = screen.get_rect()
-    safe_rect = rect.clip(screen_rect)
-    panel = pygame.Surface(rect.size, pygame.SRCALPHA)
-    if safe_rect.width > 0 and safe_rect.height > 0:
-        cut = bg_image.subsurface(safe_rect).copy()
-        ox = safe_rect.x - rect.x
-        oy = safe_rect.y - rect.y
-        panel.blit(cut, (ox, oy))
-    panel.set_alpha(alpha)
-    mask = make_rounded_mask(rect.size, radius)
-    panel.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-    screen.blit(panel, rect.topleft)
-    pygame.draw.rect(screen, border_color, rect, border_w, border_radius=radius)
+def mask_word(word, guessed):  # Κρύβει γράμματα που δεν έχουν βρεθεί
+    return " ".join([ch if ch in guessed else "_" for ch in word])  # Δείχνει γράμμα αν έχει μαντευτεί αλλιώς "_"
 
-def draw_image_button(screen, bg_image, rect, text, font, enabled=True):
-    alpha = 175 if enabled else 110
-    border = (245, 245, 245)
-    draw_image_panel(screen, bg_image, rect, alpha=alpha, radius=14, border_color=border, border_w=2)
-    draw_gold_text_center(screen, text, font, rect.centerx, rect.centery, GOLD)
+def all_revealed(word, guessed):  # Ελέγχει αν έχουν βρεθεί όλα τα γράμματα της λέξης
+    return all(ch in guessed for ch in word)  # True αν κάθε γράμμα της λέξης υπάρχει στο guessed
 
-def draw_exit_button(screen, rect, font, hover=False):
-    fill = (220, 60, 60) if not hover else (235, 90, 90)
-    pygame.draw.rect(screen, fill, rect, border_radius=8)
-    pygame.draw.rect(screen, (40, 40, 40), rect, 2, border_radius=8)
-    draw_gold_text_center(screen, "X", font, rect.centerx, rect.centery, GOLD)
+def angle_norm(a):  # “Κανονικοποιεί” μια γωνία ώστε να είναι πάντα στο 0..2π
+    twopi = 2 * math.pi  # 2π (πλήρης κύκλος)
+    a = a % twopi  # Φέρνει την γωνία σε εύρος modulo 2π
+    if a < 0:  # Αν για κάποιο λόγο βγει αρνητική
+        a += twopi  # Την διορθώνει προσθέτοντας 2π
+    return a  # Επιστρέφει τη διορθωμένη γωνία
 
-def make_glow_circle(radius, color, strength=220):
-    size = radius * 2 + 2
-    surf = pygame.Surface((size, size), pygame.SRCALPHA)
-    cx, cy = size // 2, size // 2
-    for r in range(radius, 0, -2):
-        a = int(strength * (r / radius) ** 2)
-        pygame.draw.circle(surf, (*color, a), (cx, cy), r)
-    return surf
+def pick_wheel_result(rotation, n_slices, pointer_angle=-math.pi / 2):  # Βρίσκει ποια φέτα δείχνει ο δείκτης
+    slice_angle = 2 * math.pi / n_slices  # Γωνία κάθε φέτας
+    wheel_angle = angle_norm(pointer_angle - rotation)  # Γωνία κάτω από τον δείκτη, λαμβάνοντας υπόψη την περιστροφή
+    idx = int(wheel_angle // slice_angle)  # Δείκτης φέτας (0..n_slices-1)
+    return idx  # Επιστρέφει ποια φέτα επιλέχθηκε
 
-def draw_neon_ring(screen, center, base_r, t, color_a=NEON_CYAN, color_b=NEON_PURPLE):
-    cx, cy = center
-    pulse = 0.5 + 0.5 * math.sin(t * 2.2)
-    ring_r = int(base_r + 10 + pulse * 10)
-    surf = pygame.Surface((ring_r * 2 + 6, ring_r * 2 + 6), pygame.SRCALPHA)
-    rc = surf.get_rect(center=(cx, cy))
-    scx, scy = surf.get_width() // 2, surf.get_height() // 2
-    a1 = int(70 + 80 * pulse)
-    a2 = int(55 + 70 * (1 - pulse))
-    pygame.draw.circle(surf, (*color_a, a1), (scx, scy), ring_r, 4)
-    pygame.draw.circle(surf, (*color_b, a2), (scx, scy), ring_r - 8, 3)
-    ticks = 18
-    for i in range(ticks):
-        ang = (i / ticks) * 2 * math.pi + t * 0.8
-        x1 = scx + math.cos(ang) * (ring_r - 2)
-        y1 = scy + math.sin(ang) * (ring_r - 2)
-        x2 = scx + math.cos(ang) * (ring_r + 8)
-        y2 = scy + math.sin(ang) * (ring_r + 8)
-        pygame.draw.line(surf, (*NEON_CYAN, 60), (x1, y1), (x2, y2), 2)
-    screen.blit(surf, rc.topleft)
+def wrap_letters(letters, max_per_line=14):  # Σπάει τα γράμματα σε γραμμές για να χωράνε στο panel
+    if not letters:  # Αν δεν υπάρχουν γράμματα
+        return ["-"]  # Επιστρέφει μια γραμμή με παύλα
+    parts = list(sorted(letters))  # Ταξινομεί τα γράμματα και τα κάνει λίστα
+    lines, line = [], []  # lines = τελικές γραμμές, line = προσωρινή γραμμή
+    for p in parts:  # Για κάθε γράμμα
+        line.append(p)  # Το προσθέτει στην τρέχουσα γραμμή
+        if len(line) >= max_per_line:  # Αν γέμισε η γραμμή
+            lines.append(" ".join(line))  # Την αποθηκεύει σαν string
+            line = []  # Ξεκινά νέα γραμμή
+    if line:  # Αν έμειναν γράμματα στην τελευταία γραμμή
+        lines.append(" ".join(line))  # Τα αποθηκεύει
+    return lines  # Επιστρέφει λίστα από strings (γραμμές)
 
-def draw_sparkles(screen, center, base_r, t, count=14):
-    cx, cy = center
-    for i in range(count):
-        ang = (i / count) * 2 * math.pi + t * 1.5
-        wobble = 6 * math.sin(t * 3 + i)
-        rr = base_r + 22 + wobble
-        x = cx + math.cos(ang) * rr
-        y = cy + math.sin(ang) * rr
-        a = int(70 + 100 * (0.5 + 0.5 * math.sin(t * 4 + i)))
-        pygame.draw.circle(screen, (*NEON_CYAN, a), (int(x), int(y)), 3)
-        pygame.draw.circle(screen, (*NEON_PURPLE, a // 2), (int(x), int(y)), 6, 1)
+def draw_gold_text(surface, text, font, x, y, color=GOLD):  # Ζωγραφίζει “χρυσό” κείμενο με σκιά/outline
+    shadow_img = font.render(text, True, (0, 0, 0))  # Φτιάχνει μαύρη σκιά
+    surface.blit(shadow_img, (x + 2, y + 2))  # Ζωγραφίζει τη σκιά λίγο πιο κάτω/δεξιά
+    outline_img = font.render(text, True, (20, 20, 20))  # Φτιάχνει σκούρο outline
+    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:  # 4 κατευθύνσεις
+        surface.blit(outline_img, (x + dx, y + dy))  # Ζωγραφίζει outline γύρω από το κείμενο
+    img = font.render(text, True, color)  # Φτιάχνει το τελικό κείμενο με χρυσό χρώμα
+    surface.blit(img, (x, y))  # Ζωγραφίζει το τελικό κείμενο
+    return img.get_rect(topleft=(x, y))  # Επιστρέφει rect της θέσης του κειμένου
 
-class Snowflake:
-    def __init__(self, w, h):
-        self.reset(w, h, start_top=True)
-    def reset(self, w, h, start_top=False):
-        self.x = random.uniform(0, w)
-        self.y = random.uniform(-h * 0.2, h) if not start_top else random.uniform(-h, -10)
-        self.r = random.uniform(1.0, 3.6)
-        self.speed = random.uniform(40, 140) * (0.7 + self.r / 4.0)
-        self.drift = random.uniform(-30, 30)
-        self.phase = random.uniform(0, math.pi * 2)
-    def update(self, dt, w, h, wind):
-        self.phase += dt * random.uniform(1.2, 2.2)
-        self.x += (self.drift + wind + math.sin(self.phase) * 18) * dt
-        self.y += self.speed * dt
-        if self.x < -10:
-            self.x = w + 10
-        elif self.x > w + 10:
-            self.x = -10
-        if self.y > h + 10:
-            self.reset(w, h, start_top=True)
-    def draw(self, screen):
-        pygame.draw.circle(screen, (*SNOW_WHITE, 180), (int(self.x), int(self.y)), int(self.r))
-        pygame.draw.circle(screen, (*NEON_CYAN, 45), (int(self.x), int(self.y)), int(self.r * 2), 1)
+def draw_gold_text_center(surface, text, font, cx, cy, color=GOLD):  # Ζωγραφίζει χρυσό κείμενο κεντραρισμένο
+    img = font.render(text, True, color)  # Φτιάχνει εικόνα κειμένου
+    rect = img.get_rect(center=(cx, cy))  # Υπολογίζει rect κεντραρισμένο
+    draw_gold_text(surface, text, font, rect.x, rect.y, color)  # Ζωγραφίζει με τη “χρυσή” μέθοδο
+    return rect  # Επιστρέφει rect
 
-class Game:
-    def __init__(self):
-        self.players = [
-            {"name": "ΠΑΝΑΓΙΩΤΗΣ", "score": 0},
-            {"name": "ΘΕΟΔΟΡΗΣ", "score": 0},
-            {"name": "ΤΑΞΙΑΡΧΗΣ", "score": 0},]
-        self.turn = 0
-        self.word = random.choice(WORDS)
-        self.guessed = set()
-        self.used_letters = set()
-        self.phase = "SPIN"
-        self.last_spin = None
-        self.message = "Σειρά έχει ο ΠΑΝΑΓΙΩΤΗΣ — Πάτα SPACE για να γυρίσει ο τροχός."
-        self.rotation = 0.0
-        self.angular_vel = 0.0
-        self.spinning = False
-        self.friction = 0.985
-        self.solve_mode = False
-        self.solve_text = ""
-        self.await_vowel = False
-    def current_player(self):
-        return self.players[self.turn]
-    def next_turn(self):
-        self.turn = (self.turn + 1) % len(self.players)
-        self.phase = "SPIN"
-        self.last_spin = None
-        self.solve_mode = False
-        self.solve_text = ""
-        self.await_vowel = False
-        self.message = f"Σειρά έχει ο {self.current_player()['name']} — Πάτα SPACE για SPIN."
+def make_rounded_mask(size, radius):  # Δημιουργεί μάσκα στρογγυλεμένων γωνιών
+    mask = pygame.Surface(size, pygame.SRCALPHA)  # Surface με alpha (διαφάνεια)
+    pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=radius)  # Λευκό ορθογώνιο με στρογγυλές γωνίες
+    return mask  # Επιστρέφει τη μάσκα
 
-    def start_spin(self):
-        if self.spinning or self.phase != "SPIN":
-            return
-        self.spinning = True
-        self.angular_vel = random.uniform(6.0, 10.5)
-        self.message = "Ο τροχός γυρίζει..."
+def draw_image_panel(screen, bg_image, rect, alpha=130, radius=18, border_color=(245, 245, 245), border_w=2):  # Panel “γυαλί”
+    screen_rect = screen.get_rect()  # Παίρνει το rect όλης της οθόνης
+    safe_rect = rect.clip(screen_rect)  # Περιορίζει το rect ώστε να είναι μέσα στην οθόνη
+    panel = pygame.Surface(rect.size, pygame.SRCALPHA)  # Surface για το panel με alpha
+    if safe_rect.width > 0 and safe_rect.height > 0:  # Αν το panel έχει ορατό τμήμα
+        cut = bg_image.subsurface(safe_rect).copy()  # Κόβει το αντίστοιχο κομμάτι από το background
+        ox = safe_rect.x - rect.x  # Offset x μέσα στο panel
+        oy = safe_rect.y - rect.y  # Offset y μέσα στο panel
+        panel.blit(cut, (ox, oy))  # Τοποθετεί το κομμάτι του background πάνω στο panel
+    panel.set_alpha(alpha)  # Ορίζει διαφάνεια panel
+    mask = make_rounded_mask(rect.size, radius)  # Φτιάχνει μάσκα στρογγυλεμένων γωνιών
+    panel.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)  # Εφαρμόζει τη μάσκα (κρατάει στρογγυλές γωνίες)
+    screen.blit(panel, rect.topleft)  # Ζωγραφίζει το panel στην οθόνη
+    pygame.draw.rect(screen, border_color, rect, border_w, border_radius=radius)  # Ζωγραφίζει περίγραμμα γύρω από το panel
 
-    def stop_spin(self):
-        self.spinning = False
-        self.angular_vel = 0.0
-        idx = pick_wheel_result(self.rotation, len(WHEEL_SLICES))
-        label, value = WHEEL_SLICES[idx]
-        self.last_spin = (label, value)
-        if value == "LOSE_TURN":
-            self.message = " ΧΑΝΕΙΣ ΣΕΙΡΑ!"
-            self.next_turn()
-            return
-        if value == "BANKRUPT":
-            self.current_player()["score"] = 0
-            self.message = " ΧΡΕΩΚΟΠΙΑ! ΜΗΔΕΝΙΣΜΟΣ ΣΚΟΡ! Πας στον επόμενο."
-            self.next_turn()
-            return
-        if value == "BONUS":
-            self.message = " BONUS! Διάλεξε γράμμα (A-Z) ή λύσε (ENTER)."
-            self.phase = "ACTION"
-            return
-        self.message = f" Έπεσες σε {value} πόντους. Διάλεξε ΣΥΜΦΩΝΟ (B-Z) ή λύσε (ENTER)."
-        self.phase = "ACTION"
+def draw_image_button(screen, bg_image, rect, text, font, enabled=True):  # Κουμπί με glass panel + κείμενο
+    alpha = 175 if enabled else 110  # Αν είναι ενεργό, πιο έντονο, αλλιώς πιο “σβηστό”
+    border = (245, 245, 245)  # Χρώμα περιγράμματος κουμπιού
+    draw_image_panel(screen, bg_image, rect, alpha=alpha, radius=14, border_color=border, border_w=2)  # Ζωγραφίζει βάση κουμπιού
+    draw_gold_text_center(screen, text, font, rect.centerx, rect.centery, GOLD)  # Ζωγραφίζει κείμενο κουμπιού
 
-    def update(self, dt):
-        if self.spinning:
-            self.rotation += self.angular_vel * dt
-            self.angular_vel *= (self.friction ** (dt * 60.0))
-            if self.angular_vel < 0.25:
-                self.stop_spin()
+def draw_exit_button(screen, rect, font, hover=False):  # Κουμπί “Χ” εξόδου
+    fill = (220, 60, 60) if not hover else (235, 90, 90)  # Αν υπάρχει hover, γίνεται πιο φωτεινό κόκκινο
+    pygame.draw.rect(screen, fill, rect, border_radius=8)  # Γεμιστό κόκκινο κουμπί
+    pygame.draw.rect(screen, (40, 40, 40), rect, 2, border_radius=8)  # Σκούρο περίγραμμα
+    draw_gold_text_center(screen, "X", font, rect.centerx, rect.centery, GOLD)  # Χρυσό “X” στο κέντρο
 
-    def guess_letter(self, letter):
-        letter = letter.upper()
-        if self.phase != "ACTION" or self.await_vowel or self.solve_mode:
-            return
-        if not letter.isalpha():
-            return
-        if letter in self.used_letters:
-            self.message = f"Το γράμμα {letter} έχει ήδη χρησιμοποιηθεί."
-            return
-        if letter in VOWELS:
-            self.message = "Φωνήεν! Για φωνήεν πάτα V (αγορά) και μετά γράψε το φωνήεν."
-            return
-        self.used_letters.add(letter)
-        count = self.word.count(letter)
-        if count == 0:
-            self.message = f" Δεν υπάρχει το {letter}. Πας στον επόμενο."
-            self.next_turn()
-            return
-        if self.last_spin and self.last_spin[1] == "BONUS":
-            gained = 300 * count
-        else:
-            points = self.last_spin[1] if self.last_spin and isinstance(self.last_spin[1], int) else 0
-            gained = points * count
-        self.current_player()["score"] += gained
-        self.guessed.add(letter)
-        if all_revealed(self.word, self.guessed):
-            self.current_player()["score"] += WIN_BONUS
-            self.message = f"ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
-            self.phase = "END"
-            return
-        self.message = f" Υπάρχει {count} φορά(ές) το {letter}! +{gained} πόντοι. Συνέχισε ή λύσε (ENTER)."
+def make_glow_circle(radius, color, strength=220):  # Φτιάχνει glow κύκλο με διαβάθμιση alpha
+    size = radius * 2 + 2  # Διάσταση surface που χωράει τον κύκλο
+    surf = pygame.Surface((size, size), pygame.SRCALPHA)  # Surface με alpha
+    cx, cy = size // 2, size // 2  # Κέντρο του surface
+    for r in range(radius, 0, -2):  # Από έξω προς τα μέσα
+        a = int(strength * (r / radius) ** 2)  # Alpha που μικραίνει προς τα έξω
+        pygame.draw.circle(surf, (*color, a), (cx, cy), r)  # Ζωγραφίζει κύκλο glow
+    return surf  # Επιστρέφει glow surface
 
-    def buy_vowel(self):
-        if self.phase != "ACTION" or self.solve_mode:
-            return
-        p = self.current_player()
-        if p["score"] < VOWEL_COST:
-            self.message = f"Δεν έχεις αρκετούς πόντους (χρειάζεσαι {VOWEL_COST})."
-            return
-        self.await_vowel = True
-        self.message = " Αγορά φωνήεντος: γράψε A / E / I / O / U / Y."
+def draw_neon_ring(screen, center, base_r, t, color_a=NEON_CYAN, color_b=NEON_PURPLE):  # Neon δαχτυλίδια γύρω από τον τροχό
+    cx, cy = center  # Αποσυσκευάζει κέντρο
+    pulse = 0.5 + 0.5 * math.sin(t * 2.2)  # Παλμός 0..1
+    ring_r = int(base_r + 10 + pulse * 10)  # Ακτίνα που “αναπνέει”
+    surf = pygame.Surface((ring_r * 2 + 6, ring_r * 2 + 6), pygame.SRCALPHA)  # Surface για δαχτυλίδι
+    rc = surf.get_rect(center=(cx, cy))  # Rect κεντραρισμένο στη σκηνή
+    scx, scy = surf.get_width() // 2, surf.get_height() // 2  # Κέντρο μέσα στο surf
+    a1 = int(70 + 80 * pulse)  # Alpha για το πρώτο δαχτυλίδι
+    a2 = int(55 + 70 * (1 - pulse))  # Alpha για το δεύτερο δαχτυλίδι
+    pygame.draw.circle(surf, (*color_a, a1), (scx, scy), ring_r, 4)  # Εξωτερικό δαχτυλίδι
+    pygame.draw.circle(surf, (*color_b, a2), (scx, scy), ring_r - 8, 3)  # Εσωτερικό δαχτυλίδι
+    ticks = 18  # Πόσες “χαρακιές” θα έχει γύρω γύρω
+    for i in range(ticks):  # Για κάθε χαρακι
+        ang = (i / ticks) * 2 * math.pi + t * 0.8  # Γωνία tick με περιστροφή στο χρόνο
+        x1 = scx + math.cos(ang) * (ring_r - 2)  # Αρχή γραμμής tick
+        y1 = scy + math.sin(ang) * (ring_r - 2)  # Αρχή γραμμής tick
+        x2 = scx + math.cos(ang) * (ring_r + 8)  # Τέλος γραμμής tick
+        y2 = scy + math.sin(ang) * (ring_r + 8)  # Τέλος γραμμής tick
+        pygame.draw.line(surf, (*NEON_CYAN, 60), (x1, y1), (x2, y2), 2)  # Ζωγραφίζει το tick
+    screen.blit(surf, rc.topleft)  # Ζωγραφίζει το δαχτυλίδι στην οθόνη
 
-    def guess_vowel(self, letter):
-        if self.phase != "ACTION" or not self.await_vowel or self.solve_mode:
-            return
-        letter = letter.upper()
-        if not letter.isalpha():
-            return
-        if letter not in VOWELS:
-            self.message = "Αυτό δεν είναι φωνήεν. Δοκίμασε A / E / I / O / U /  Y."
-            return
-        if letter in self.used_letters:
-            self.await_vowel = False
-            self.message = f"Το {letter} έχει ήδη χρησιμοποιηθεί. Συνέχισε."
-            return
-        p = self.current_player()
-        p["score"] -= VOWEL_COST
-        self.used_letters.add(letter)
-        count = self.word.count(letter)
-        self.await_vowel = False
-        if count == 0:
-            self.message = f" Δεν υπάρχει το {letter}. -{VOWEL_COST} πόντοι και πας στον επόμενο."
-            self.next_turn()
-            return
-        self.guessed.add(letter)
-        if all_revealed(self.word, self.guessed):
-            p["score"] += WIN_BONUS
-            self.message = f"ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
-            self.phase = "END"
-            return
-        self.message = f" Υπάρχει {count} φορά(ές) το {letter}! (αγορά -{VOWEL_COST}). Συνέχισε!"
+def draw_sparkles(screen, center, base_r, t, count=14):  # Σπινθηρισμοί γύρω από τον τροχό
+    cx, cy = center  # Κέντρο
+    for i in range(count):  # Για κάθε sparkle
+        ang = (i / count) * 2 * math.pi + t * 1.5  # Γωνία sparkle που περιστρέφεται με τον χρόνο
+        wobble = 6 * math.sin(t * 3 + i)  # Μικρή ταλάντωση (πιο “ζωντανό” εφέ)
+        rr = base_r + 22 + wobble  # Απόσταση από το κέντρο
+        x = cx + math.cos(ang) * rr  # Θέση x
+        y = cy + math.sin(ang) * rr  # Θέση y
+        a = int(70 + 100 * (0.5 + 0.5 * math.sin(t * 4 + i)))  # Alpha sparkle
+        pygame.draw.circle(screen, (*NEON_CYAN, a), (int(x), int(y)), 3)  # Μικρός φωτεινός κύκλος
+        pygame.draw.circle(screen, (*NEON_PURPLE, a // 2), (int(x), int(y)), 6, 1)  # Εξωτερικός κύκλος outline
 
-    def start_solve(self):
-        if self.phase != "ACTION":
-            return
-        self.solve_mode = True
-        self.solve_text = ""
-        self.await_vowel = False
-        self.message = "Γράψε τη λύση και πάτα ENTER (ESC για ακύρωση)."
+class Snowflake:  # Κλάση που περιγράφει μία νιφάδα χιονιού
+    def __init__(self, w, h):  # Constructor: φτιάχνει νιφάδα
+        self.reset(w, h, start_top=True)  # Αρχικοποιεί θέση/ταχύτητα με ένα reset
 
-    def submit_solve(self):
-        if not self.solve_mode:
-            return
-        attempt = self.solve_text.strip().upper().replace(" ", "")
-        target = self.word.replace(" ", "")
-        self.solve_mode = False
+    def reset(self, w, h, start_top=False):  # Επαναφέρει τη νιφάδα (π.χ. όταν βγει κάτω)
+        self.x = random.uniform(0, w)  # Τυχαία θέση x
+        self.y = random.uniform(-h * 0.2, h) if not start_top else random.uniform(-h, -10)  # Αν start_top, ξεκινά από πάνω
+        self.r = random.uniform(1.0, 3.6)  # Ακτίνα (μέγεθος)
+        self.speed = random.uniform(40, 140) * (0.7 + self.r / 4.0)  # Ταχύτητα πτώσης (με βάση και το μέγεθος)
+        self.drift = random.uniform(-30, 30)  # Πλάγια μετατόπιση
+        self.phase = random.uniform(0, math.pi * 2)  # Φάση για κυματιστή κίνηση
 
-        if attempt == target:
-            self.current_player()["score"] += WIN_BONUS
-            self.message = f"ΜΠΡΑΒΟ! Η λέξη ήταν: {self.word} (+{WIN_BONUS} bonus). Τέλος γύρου! (N)"
-            self.phase = "END"
-        else:
-            self.message = f" ΛΑΘΟΣ! Η σωστή λέξη ήταν: {self.word}. Πας στον επόμενο."
-            self.next_turn()
+    def update(self, dt, w, h, wind):  # Ενημέρωση κίνησης νιφάδας
+        self.phase += dt * random.uniform(1.2, 2.2)  # Αλλάζει τη φάση με τον χρόνο
+        self.x += (self.drift + wind + math.sin(self.phase) * 18) * dt  # Κίνηση στον άξονα x (drift + wind + κυματισμός)
+        self.y += self.speed * dt  # Κίνηση στον άξονα y (πέφτει προς τα κάτω)
+        if self.x < -10:  # Αν βγει αριστερά
+            self.x = w + 10  # Εμφανίζεται από δεξιά
+        elif self.x > w + 10:  # Αν βγει δεξιά
+            self.x = -10  # Εμφανίζεται από αριστερά
+        if self.y > h + 10:  # Αν βγει κάτω από την οθόνη
+            self.reset(w, h, start_top=True)  # Την ξαναστέλνουμε από πάνω
 
-    def cancel_solve(self):
-        if self.solve_mode:
-            self.solve_mode = False
-            self.solve_text = ""
-            self.message = "Ακύρωση λύσης. Συνέχισε με γράμμα ή ENTER για λύση."
+    def draw(self, screen):  # Ζωγραφίζει τη νιφάδα
+        pygame.draw.circle(screen, (*SNOW_WHITE, 180), (int(self.x), int(self.y)), int(self.r))  # Κύρια νιφάδα
+        pygame.draw.circle(screen, (*NEON_CYAN, 45), (int(self.x), int(self.y)), int(self.r * 2), 1)  # Neon περίγραμμα
 
-    def reset_round(self):
-        self.word = random.choice(WORDS)
-        self.guessed = set()
-        self.used_letters = set()
-        self.phase = "SPIN"
-        self.last_spin = None
-        self.solve_mode = False
-        self.solve_text = ""
-        self.await_vowel = False
-        self.message = f"Νέος γύρος! Σειρά έχει ο {self.current_player()['name']} — Πάτα SPACE για SPIN."
-        
-def main():
-    pygame.init()
-    pygame.display.set_caption("Ο Τροχός των Χριστουγέννων 2060")
-    info = pygame.display.Info()
-    WIDTH, HEIGHT = info.current_w, info.current_h
-    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.NOFRAME)
-    try:
-        bg_image = pygame.image.load(BG_PATH).convert()
-    except Exception as e:
-        print("Δεν μπόρεσα να φορτώσω την εικόνα:", BG_PATH)
-        print("Σφάλμα:", e)
-        pygame.quit()
-        return
-    bg_image = pygame.transform.smoothscale(bg_image, (WIDTH, HEIGHT))
-    final_image = None
-    try:
-        final_image = pygame.image.load(FINAL_IMAGE_PATH).convert_alpha()
-    except Exception as e:
-        print("Δεν μπόρεσα να φορτώσω την τελική εικόνα:", FINAL_IMAGE_PATH)
-        print("Σφάλμα:", e)
-        final_image = None
-    clock = pygame.time.Clock()
+class Game:  # Κλάση που κρατάει ΟΛΟΥΣ τους κανόνες και την κατάσταση του παιχνιδιού
+    def __init__(self):  # Αρχικοποίηση παιχνιδιού
+        self.players = [  # Λίστα παικτών (όνομα + σκορ)
+            {"name": "PANAGIOTIS", "score": 0},  # Παίκτης 1
+            {"name": "THEODORIS", "score": 0},  # Παίκτης 2
+            {"name": "TAXIARCHIS", "score": 0},  # Παίκτης 3
+        ]
 
-    font_title = pygame.font.SysFont("Segoe UI", 56, bold=True)
-    font_players = pygame.font.SysFont("Segoe UI", 26, bold=True)
-    font_players_turn = pygame.font.SysFont("Segoe UI", 30, bold=True)
-    font_header = pygame.font.SysFont("Segoe UI", 34, bold=True)
-    font_header_small = pygame.font.SysFont("Segoe UI", 28, bold=True)
-    font_med = pygame.font.SysFont("Segoe UI", 22, bold=True)
-    font_small = pygame.font.SysFont("Segoe UI", 18, bold=True)
-    font_wheel = pygame.font.SysFont("Segoe UI", 18, bold=True)
+        self.spin_sound = None  # Μεταβλητή που θα κρατάει τον ήχο spin (pygame Sound)
+        self.spin_channel = None  # Κανάλι αναπαραγωγής ήχου (για stop)
 
-    wheel_radius = 260
-    wheel_surf_size = wheel_radius * 2 + 40
-    wheel_base = pygame.Surface((wheel_surf_size, wheel_surf_size), pygame.SRCALPHA)
-    wc = wheel_surf_size // 2
+        self.turn = 0  # Δείκτης του παίκτη που παίζει τώρα
+        self.word = random.choice(WORDS)  # Επιλέγει τυχαία λέξη
+        self.guessed = set()  # Σύνολο γραμμάτων που έχουν βρεθεί
+        self.used_letters = set()  # Σύνολο γραμμάτων που έχουν δοκιμαστεί (σωστά/λάθος)
 
-    n_slices = len(WHEEL_SLICES)
-    slice_angle = 2 * math.pi / n_slices
+        self.phase = "SPIN"  # Κατάσταση παιχνιδιού: "SPIN" -> πρέπει να γυρίσει τροχός
+        self.last_spin = None  # Το τελευταίο αποτέλεσμα του τροχού (label, value)
+        self.message = "It's PANAGIOTIS' turn — press SPACE to spin the wheel."  # Μήνυμα UI
 
-    NEON_PALETTE = [
-        (70, 240, 255),
-        (140, 110, 255),
-        (255, 90, 190),
-        (255, 160, 80),
-        (90, 255, 190),
-        (255, 110, 110),]
+        self.rotation = 0.0  # Τρέχουσα γωνία περιστροφής τροχού (radians)
+        self.angular_vel = 0.0  # Γωνιακή ταχύτητα (radians/sec)
+        self.spinning = False  # Αν ο τροχός γυρίζει αυτή τη στιγμή
+        self.friction = 0.985  # Συντελεστής “τριβής” (μειώνει την ταχύτητα σταδιακά)
 
-    def tint(col, k):
-        return (
-            max(0, min(255, int(col[0] * k))),
-            max(0, min(255, int(col[1] * k))),
-            max(0, min(255, int(col[2] * k))),)
+        self.solve_mode = False  # Αν ο παίκτης γράφει πλήρη λύση (solve)
+        self.solve_text = ""  # Κείμενο που πληκτρολογεί ο παίκτης ως λύση
+        self.await_vowel = False  # Αν περιμένουμε να δώσει φωνήεν μετά το V
 
-    slice_colors = []
-    for i in range(n_slices):
-        base = NEON_PALETTE[i % len(NEON_PALETTE)]
-        col = tint(base, 1.00 if i % 2 == 0 else 0.72)
-        slice_colors.append(col)
+    def current_player(self):  # Επιστρέφει τον τρέχοντα παίκτη (dict)
+        return self.players[self.turn]  # Παίρνει από τη λίστα players το στοιχείο στο index turn
 
-    def render_wheel():
-        wheel_base.fill((0, 0, 0, 0))
-        for i, (label, _) in enumerate(WHEEL_SLICES):
-            start = i * slice_angle
-            end = start + slice_angle
-            pts = [(wc, wc)]
-            steps = 30
-            for s in range(steps + 1):
-                a = start + (end - start) * (s / steps)
-                x = wc + math.cos(a) * wheel_radius
-                y = wc + math.sin(a) * wheel_radius
-                pts.append((x, y))
-            pygame.draw.polygon(wheel_base, slice_colors[i], pts)
-            shade = pygame.Surface((wheel_surf_size, wheel_surf_size), pygame.SRCALPHA)
-            pygame.draw.polygon(shade, (0, 0, 0, 55), pts)
-            pygame.draw.polygon(shade, (255, 255, 255, 25), pts, 1)
-            wheel_base.blit(shade, (0, 0))
-            pygame.draw.polygon(wheel_base, (15, 15, 15), pts, 2)
-            mid = start + slice_angle / 2
-            tx = wc + math.cos(mid) * (wheel_radius * 0.62)
-            ty = wc + math.sin(mid) * (wheel_radius * 0.62)
-            rect = font_wheel.render(label, True, GOLD).get_rect(center=(tx, ty))
-            draw_gold_text(wheel_base, label, font_wheel, rect.x, rect.y, GOLD)
+    def next_turn(self):  # Πηγαίνει στον επόμενο παίκτη
+        self.turn = (self.turn + 1) % len(self.players)  # Αυξάνει σειρά και κάνει “κύκλο” με modulo
+        self.phase = "SPIN"  # Επιστρέφει σε φάση SPIN
+        self.last_spin = None  # Καθαρίζει το τελευταίο spin
+        self.solve_mode = False  # Βγαίνει από solve mode
+        self.solve_text = ""  # Καθαρίζει το κείμενο λύσης
+        self.await_vowel = False  # Δεν περιμένει φωνήεν
+        self.message = f"It's {self.current_player()['name']}'s turn — press SPACE to SPIN."  # Νέο μήνυμα σειράς
 
-        pygame.draw.circle(wheel_base, (10, 10, 10), (wc, wc), wheel_radius, 6)
+    def set_sound(self, sound, channel):  # Ρυθμίζει τον ήχο περιστροφής
+        self.spin_sound = sound  # Αποθηκεύει το sound
+        self.spin_channel = channel  # Αποθηκεύει το channel
 
-    render_wheel()
-    cached_deg = None
-    cached_img = None
+    def start_spin(self):  # Ξεκινάει το γύρισμα του τροχού
+        if self.spin_sound:  # Αν υπάρχει φορτωμένος ήχος
+            try:  # Προσπαθεί να παίξει ήχο σε loop
+                self.spin_channel = self.spin_sound.play(loops=-1)  # Παίζει συνεχόμενα μέχρι stop
+            except:  # Αν αποτύχει, το αγνοεί
+                pass  # Δεν κάνει τίποτα
+        if self.spinning or self.phase != "SPIN":  # Αν ήδη γυρίζει ή δεν είμαστε σε SPIN φάση
+            return  # Δεν ξεκινάει νέο spin
+        self.spinning = True  # Θέτει ότι ο τροχός γυρίζει
+        self.angular_vel = random.uniform(6.0, 10.5)  # Δίνει τυχαία αρχική γωνιακή ταχύτητα
+        self.message = "The wheel is spinning..."  # Ενημερώνει μήνυμα
 
-    def get_wheel_image(rotation):
-        nonlocal cached_deg, cached_img
-        deg = -math.degrees(rotation)
-        qdeg = int(round(deg / 2) * 2)
-        if cached_img is None or qdeg != cached_deg:
-            cached_deg = qdeg
-            cached_img = pygame.transform.rotate(wheel_base, qdeg)
-        return cached_img
-    glow_outer = make_glow_circle(wheel_radius + 80, NEON_CYAN, strength=120)
-    glow_inner = make_glow_circle(wheel_radius + 40, NEON_PURPLE, strength=110)
+    def stop_spin(self):  # Σταματάει το γύρισμα και αποφασίζει αποτέλεσμα
+        self.spinning = False  # Δηλώνει ότι δεν γυρίζει πια
+        self.angular_vel = 0.0  # Μηδενίζει ταχύτητα
+        idx = pick_wheel_result(self.rotation, len(WHEEL_SLICES))  # Υπολογίζει φέτα που δείχνει ο δείκτης
+        label, value = WHEEL_SLICES[idx]  # Παίρνει label και value από τη φέτα
+        self.last_spin = (label, value)  # Αποθηκεύει το αποτέλεσμα
 
-    CENTER_X = WIDTH // 2
-    cx = (WIDTH // 2) - 60
-    cy = (HEIGHT // 2) + 40
-    pointer_y = cy - wheel_radius - 18
-    btn_w = 220
-    btn_h = 52
-    btn_gap = 13
-    total_h = btn_h * 3 + btn_gap * 2
-    start_y = (HEIGHT // 2) - (total_h // 2) - 175
-    left_x = 170
-    btn_spin = pygame.Rect(left_x, start_y, btn_w, btn_h)
-    btn_vowel = pygame.Rect(left_x, start_y + (btn_h + btn_gap), btn_w, btn_h)
-    btn_new_round = pygame.Rect(left_x, start_y + 2 * (btn_h + btn_gap), btn_w, btn_h)
-    btn_exit = pygame.Rect(WIDTH - 60, 20, 40, 40)
-    right_margin = 40
-    right_w = max(360, int(WIDTH * 0.32))
-    right_x = WIDTH - right_w - right_margin
-    base_y = int(HEIGHT * 0.20)
-    players_panel = pygame.Rect(right_x, base_y, right_w, 260)
-    word_panel = pygame.Rect(right_x, players_panel.bottom + 18, right_w, 175)
-    used_panel = pygame.Rect(right_x, word_panel.bottom + 14, right_w, 110)
-    msg_panel_width = WIDTH // 2
-    msg_panel_x = (WIDTH - msg_panel_width) // 2
-    msg_panel = pygame.Rect(msg_panel_x, HEIGHT - 70, msg_panel_width, 45)
-    snow_count = int((WIDTH * HEIGHT) / (1920 * 1080) * 220)
-    snow_count = max(140, min(320, snow_count))
-    snowflakes = [Snowflake(WIDTH, HEIGHT) for _ in range(snow_count)]
-    wind = 0.0
-    finish_mode = False
-    finish_timer = 0.0
-    finish_show_image = False
-    game = Game()
-    t = 0.0
-    running = True
-    while running:
-        dt = clock.tick(FPS) / 1000.0
-        t += dt
-        if not finish_mode:
-            game.update(dt)
-        wind = 40 * math.sin(t * 0.35)
-        for flake in snowflakes:
-            flake.update(dt, WIDTH, HEIGHT, wind)
-        if finish_mode:
-            finish_timer += dt
-            if finish_timer >= 7.0:
-                finish_show_image = True
+        if self.spin_channel:  # Αν παίζει ήχος
+            try:  # Προσπαθεί να τον σταματήσει
+                self.spin_channel.stop()  # Stop του channel
+            except:  # Αν αποτύχει
+                pass  # Δεν κάνει τίποτα
+            self.spin_channel = None  # Καθαρίζει το channel
 
-        mx, my = pygame.mouse.get_pos()
-        exit_hover = btn_exit.collidepoint(mx, my)
+        if value == "LOSE_TURN":  # Αν το αποτέλεσμα είναι “χάνει σειρά”
+            self.message = "YOU LOSE A TURN!"  # Μήνυμα
+            self.next_turn()  # Πάει στον επόμενο
+            return  # Τερματίζει stop_spin εδώ
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                # Finish mode: SPACE/ESC -> νέο γύρο
-                if finish_mode:
-                    if event.key in (pygame.K_SPACE, pygame.K_ESCAPE):
-                        finish_mode = False
-                        game.reset_round()
-                    continue
-                if event.key == pygame.K_ESCAPE:
-                    if game.solve_mode:
-                        game.cancel_solve()
-                if event.key == pygame.K_SPACE:
-                    if game.phase == "SPIN" and not game.spinning:
-                        game.start_spin()
-                if event.key == pygame.K_n and game.phase == "END":
-                    finish_mode = True
-                    finish_timer = 0.0
-                    finish_show_image = False
-                if game.phase == "ACTION":
-                    if event.key == pygame.K_RETURN:
-                        if not game.solve_mode:
-                            game.start_solve()
-                        else:
-                            game.submit_solve()
-                    if event.key == pygame.K_v:
-                        game.buy_vowel()
-                    if game.await_vowel:
-                        ch = event.unicode.upper()
-                        if ch and ch.isalpha():
-                            game.guess_vowel(ch)
-                        continue
-                    if game.solve_mode:
-                        if event.key == pygame.K_BACKSPACE:
-                            game.solve_text = game.solve_text[:-1]
-                        else:
-                            ch = event.unicode
-                            if ch and (ch.isalpha() or ch == " "):
-                                game.solve_text += ch.upper()
-                        continue
-                    ch = event.unicode.upper()
-                    if ch and ch.isalpha():
-                        game.guess_letter(ch)
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                mx, my = event.pos
-                if btn_exit.collidepoint(mx, my):
-                    running = False
-                if finish_mode:
-                    continue
-                if btn_spin.collidepoint(mx, my):
-                    if game.phase == "SPIN" and not game.spinning:
-                        game.start_spin()
-                if btn_vowel.collidepoint(mx, my):
-                    if game.phase == "ACTION" and not game.spinning:
-                        game.buy_vowel()
-                if btn_new_round.collidepoint(mx, my):
-                    pass
+        if value == "BANKRUPT":  # Αν το αποτέλεσμα είναι “χρεοκοπία”
+            self.current_player()["score"] = 0  # Μηδενίζει σκορ παίκτη
+            self.message = "BANKRUPT! SCORE RESET TO ZERO! Next player."  # Μήνυμα
+            self.next_turn()  # Επόμενος παίκτης
+            return  # Τερματίζει stop_spin εδώ
 
+        if value == "BONUS":  # Αν είναι BONUS
+            self.message = "BONUS! Choose a letter (A-Z) or solve (ENTER)."  # Μήνυμα επιλογής
+            self.phase = "ACTION"  # Πηγαίνει σε φάση δράσης
+            return  # Τερματίζει stop_spin εδώ
 
-        screen.blit(bg_image, (0, 0))
-        for flake in snowflakes:
-            flake.draw(screen)
-        if finish_mode:
-            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 160))
-            screen.blit(overlay, (0, 0))
-            if not finish_show_image:
-                box_w = int(WIDTH * 0.70)
-                box_h = 160
-                box = pygame.Rect((WIDTH - box_w) // 2, (HEIGHT - box_h) // 2, box_w, box_h)
-                pygame.draw.rect(screen, (20, 20, 20), box, border_radius=22)
-                col = neon_cycle_color(t, speed=1.1)
-                pulse = 0.5 + 0.5 * math.sin(t * 6.0)
-                bw = 4 + int(3 * pulse)
-                pygame.draw.rect(screen, col, box, bw, border_radius=22)
-                draw_neon_text_center(screen, "< ALGORITHNICS FOR EVER >", font_title, WIDTH // 2, HEIGHT // 2, t)
-                winner = max(game.players, key=lambda p: p["score"])
-                draw_gold_text_center(screen, f"ΝΙΚΗΤΗΣ: {winner['name']}!", font_header, WIDTH // 2, HEIGHT // 2 + 62, GOLD)
+        self.message = f"You landed on {value} points. Choose a CONSONANT (B-Z) or solve (ENTER)."  # Κανονική φέτα πόντων
+        self.phase = "ACTION"  # Μετά το spin, μπαίνει σε φάση επιλογής γράμματος/λύσης
 
-            else:
-                if final_image:
-                    iw, ih = final_image.get_size()
-                    scale = min(WIDTH / iw, HEIGHT / ih)
-                    nw, nh = int(iw * scale), int(ih * scale)
-                    img = pygame.transform.smoothscale(final_image, (nw, nh))
-                    screen.blit(img, img.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
-                else:
-                    draw_gold_text_center(screen, "❌ Δεν βρέθηκε η τελική εικόνα!", font_title, WIDTH // 2, HEIGHT // 2, GOLD)
+    def update(self, dt):  # Ενημέρωση παιχνιδιού με βάση τον χρόνο dt
+        if self.spinning:  # Αν ο τροχός γυρίζει
+            self.rotation += self.angular_vel * dt  # Αυξάνει τη γωνία περιστροφής
+            self.angular_vel *= (self.friction ** (dt * 60.0))  # Μειώνει ταχύτητα με “τριβή”
+            if self.angular_vel < 0.25:  # Αν γίνει πολύ μικρή η ταχύτητα
+                self.stop_spin()  # Σταματάει και κλειδώνει αποτέλεσμα
 
-                draw_gold_text_center(screen, "Πάτα SPACE για νέο γύρο", font_med, WIDTH // 2, HEIGHT - 70, GOLD)
+    def guess_letter(self, letter):  # Μάντεμα συμφώνου
+        letter = letter.upper()  # Κάνει το γράμμα κεφαλαίο
+        if self.phase != "ACTION" or self.await_vowel or self.solve_mode:  # Αν δεν είμαστε σε ACTION ή περιμένουμε φωνήεν ή γράφουμε λύση
+            return  # Δεν επιτρέπεται μάντεμα
+        if not letter.isalpha():  # Αν δεν είναι γράμμα
+            return  # Το αγνοεί
+        if letter in self.used_letters:  # Αν το γράμμα έχει ήδη χρησιμοποιηθεί
+            self.message = f"The letter {letter} has already been used."  # Μήνυμα
+            return  # Σταματά
+        if letter in VOWELS:  # Αν είναι φωνήεν
+            self.message = "Vowel! To buy a vowel press V, then type the vowel."  # Εξηγεί ότι θέλει αγορά
+            return  # Σταματά
+        self.used_letters.add(letter)  # Καταγράφει ότι το γράμμα χρησιμοποιήθηκε
+        count = self.word.count(letter)  # Μετρά πόσες φορές υπάρχει στη λέξη
+        if count == 0:  # Αν δεν υπάρχει
+            self.message = f"No {letter} found. Next player."  # Μήνυμα αποτυχίας
+            self.next_turn()  # Επόμενος παίκτης
+            return  # Τερματίζει
 
-            pygame.display.flip()
-            continue
-        
-        draw_exit_button(screen, btn_exit, font_med, hover=exit_hover)
-        draw_neon_text_center(screen, "Ο ΤΡΟΧΟΣ ΤΩΝ ΧΡΙΣΤΟΥΓΕΝΝΩΝ 2060", font_title, CENTER_X, 36, t)
-        spin_enabled = (game.phase == "SPIN" and not game.spinning)
-        vowel_enabled = (game.phase == "ACTION" and not game.spinning and not game.solve_mode)
-        new_enabled = (game.phase == "END")
-        draw_image_button(screen, bg_image, btn_spin, "SPIN (SPACE)", font_med, enabled=spin_enabled)
-        draw_image_button(screen, bg_image, btn_vowel, f"ΦΩΝΗΕΝ (V) -{VOWEL_COST}", font_med, enabled=vowel_enabled)
-        draw_image_button(screen, bg_image, btn_new_round, "ΝΕΟΣ ΓΥΡΟΣ (N)", font_med, enabled=new_enabled)
-        ppointer = [(cx, pointer_y), (cx - 18, pointer_y + 34), (cx + 18, pointer_y + 34)]
-        pygame.draw.polygon(screen, (255, 90, 90), ppointer)
-        pygame.draw.polygon(screen, (255, 255, 255), ppointer, 1)
-        pg = pygame.Surface((60, 60), pygame.SRCALPHA)
-        pygame.draw.circle(pg, (*NEON_CYAN, 55), (30, 30), 22, 3)
-        screen.blit(pg, (cx - 30, pointer_y + 8))
-        pulse = 0.5 + 0.5 * math.sin(t * 2.0)
-        a_outer = int(80 + 70 * pulse)
-        a_inner = int(70 + 60 * (1 - pulse))
-        g1 = glow_outer.copy()
-        g2 = glow_inner.copy()
-        g1.set_alpha(a_outer)
-        g2.set_alpha(a_inner)
-        r1 = g1.get_rect(center=(cx, cy))
-        r2 = g2.get_rect(center=(cx, cy))
-        screen.blit(g1, r1.topleft)
-        screen.blit(g2, r2.topleft)
-        draw_neon_ring(screen, (cx, cy), wheel_radius, t)
-        draw_sparkles(screen, (cx, cy), wheel_radius, t, count=16)
-        wheel_img = get_wheel_image(game.rotation)
-        wheel_rect = wheel_img.get_rect(center=(cx, cy))
-        screen.blit(wheel_img, wheel_rect)
-        hub_col = neon_cycle_color(t, speed=1.2)
-        hub_pulse = 0.5 + 0.5 * math.sin(t * 6.0)
-        hub_r = int(14 + 3 * hub_pulse)
-        hub_glow_r = int(34 + 10 * hub_pulse)
-        hub_glow = pygame.Surface((hub_glow_r * 2 + 2, hub_glow_r * 2 + 2), pygame.SRCALPHA)
-        pygame.draw.circle(hub_glow, (*hub_col, int(70 + 120 * hub_pulse)), (hub_glow_r + 1, hub_glow_r + 1), hub_glow_r)
-        pygame.draw.circle(hub_glow, (*hub_col, int(40 + 80 * (1 - hub_pulse))), (hub_glow_r + 1, hub_glow_r + 1), hub_glow_r - 10, 3)
-        screen.blit(hub_glow, hub_glow.get_rect(center=(cx, cy)).topleft)
-        pygame.draw.circle(screen, hub_col, (cx, cy), hub_r)
-        pygame.draw.circle(screen, (10, 10, 10), (cx, cy), hub_r, 2)
-        draw_image_panel(screen, bg_image, players_panel, alpha=130, radius=18)
-        draw_image_panel(screen, bg_image, word_panel, alpha=130, radius=18)
-        draw_image_panel(screen, bg_image, used_panel, alpha=130, radius=18)
-        draw_image_panel(screen, bg_image, msg_panel, alpha=140, radius=18)
-        draw_gold_text_center(screen, "ΛΕΞΗ", font_header, word_panel.centerx, word_panel.y + 34, GOLD)
-        masked = mask_word(game.word, game.guessed)
-        draw_gold_text_center(screen, masked, font_players_turn, word_panel.centerx, word_panel.y + 105, GOLD)
-        if game.solve_mode:
-            solve_panel = pygame.Rect(word_panel.x + 12, word_panel.bottom - 80, word_panel.w - 24, 65)
-            draw_image_panel(screen, bg_image, solve_panel, alpha=150, radius=14)
-            draw_gold_text(screen, "ΛΥΣΗ:", font_med, solve_panel.x + 12, solve_panel.y + 8, GOLD)
-            draw_gold_text(screen, game.solve_text, font_med, solve_panel.x + 12, solve_panel.y + 34, GOLD)
-        draw_gold_text_center(screen, "ΠΑΙΚΤΗΣ : ΠΟΝΤΟΙ", font_header, players_panel.centerx, players_panel.y + 34, GOLD)
-        y = players_panel.y + 78
-        for i, p in enumerate(game.players):
-            is_turn = (i == game.turn and game.phase != "END")
-            prefix = "➡ " if is_turn else "   "
-            line = f"{prefix}{p['name']}: {p['score']} πόντοι"
-            draw_gold_text(screen, line, font_players_turn if is_turn else font_players, players_panel.x + 16, y, GOLD)
-            y += 56
-        draw_gold_text_center(screen, "ΕΠΙΛΕΓΜΕΝΑ ΓΡΑΜΜΑΤΑ", font_header_small, used_panel.centerx, used_panel.y + 24, GOLD)
-        lines = wrap_letters(game.used_letters, max_per_line=18)
-        yy = used_panel.y + 52
-        for line in lines[:2]:
-            draw_gold_text(screen, line if line else "-", font_small, used_panel.x + 14, yy, GOLD)
-            yy += 26
-        draw_gold_text_center(screen, game.message, font_med, msg_panel.centerx, msg_panel.centery)
-        for flake in snowflakes[: max(20, snow_count // 8)]:
-            pygame.draw.circle(screen, (*SNOW_WHITE, 200), (int(flake.x), int(flake.y)), int(flake.r + 1))
-        pygame.display.flip()
-    pygame.quit()
+        if self.last_spin and self.last_spin[1] == "BONUS":  # Αν το τελευταίο spin ήταν BONUS
+            gained = 300 * count  # Κερδίζει 300 ανά εμφάνιση γράμματος
+        else:  # Αλλιώς κανονικοί πόντοι
+            points = self.last_spin[1] if self.last_spin and isinstance(self.last_spin[1], int) else 0  # Παίρνει την τιμή πόντων
+            gained = points * count  # Πόντοι * πλήθος εμφανίσεων
 
-if __name__ == "__main__":
-    main()
+        self.current_player()["score"] += gained  # Προσθέτει τους πόντους στο σκορ
+        self.guessed.add(letter)  # Καταγράφει ότι το γράμμα έχει βρεθεί
+        if all_revealed(self.word, self.guessed):  # Αν αποκαλύφθηκαν όλα τα γράμματα
+            self.current_player()["score"] += WIN_BONUS  # Προσθέτει bonus νίκης
+            self.message = f"BRAVO! The word was: {self.word} (+{WIN_BONUS} bonus). End of round! (N)"  # Μήνυμα νίκης
+            self.phase = "END"  # Φάση τέλους γύρου
+            return  # Τερματίζει
+        self.message = f"There are {count} {letter}(s)! +{gained} points. Continue or solve (ENTER)."  # Μήνυμα συνέχειας
 
+    def buy_vowel(self):  # Αγορά φωνήεντος
+        if self.phase != "ACTION" or self.solve_mode:  # Αν δεν είμαστε σε ACTION ή γράφουμε λύση
+            return  # Δεν επιτρέπεται
+        p = self.current_player()  # Παίρνει τρέχοντα παίκτη
+        if p["score"] < VOWEL_COST:  # Αν δεν έχει αρκετούς πόντους
+            self.message = f"Not enough points (you need {VOWEL_COST})."  # Μήνυμα
+            return  # Τερματίζει
+        self.await_vowel = True  # Θέτει ότι περιμένει φωνήεν
+        self.message = "Buying a vowel: type A / E / I / O / U / Y."  # Μήνυμα οδηγίας
 
+    def guess_vowel(self, letter):  # Μάντεμα φωνήεντος μετά την αγορά
+        if self.phase != "ACTION" or not self.await_vowel or self.solve_mode:  # Αν δεν περιμένουμε φωνήεν ή δεν είμαστε σε ACTION
+            return  # Δεν επιτρέπεται
+        letter = letter.upper()  # Κάνει κεφαλαίο
+        if not letter.isalpha():  # Αν δεν είναι γράμμα
+            return  # Αγνοεί
+        if letter not in VOWELS:  # Αν δεν είναι φωνήεν
+            self.message = "That's not a vowel. Try A / E / I / O / U / Y."  # Μήνυμα λάθους
+            return  # Τερματίζει
+        if letter in self.used_letters:  # Αν έχει ήδη χρησιμοποιηθεί
+            self.await_vowel = False  # Σταματά να περιμένει φωνήεν
+            self.message = f"{letter} has already been used. Continue."  # Μήνυμα
+            return  # Τερματίζει
+
+        p = self.current_player()  # Παίρνει παίκτη
+        p["score"] -= VOWEL_COST  # Αφαιρεί το κόστος αγοράς φωνήεντος
+        self.used_letters.add(letter)  # Καταγράφει χρήση γράμματος
+        count = self.word.count(letter)  # Μετρά εμφανίσεις του φωνήεντος
+        self.await_vowel = False  # Τέλος αναμονής φωνήεντος
+
+        if count == 0:  # Αν δεν υπάρχει στη λέξη
+            self.message = f"No {letter} found. -{VOWEL_COST} points and next player."  # Μήνυμα
+            self.next_turn()  # Επόμενος
+            return  # Τερματίζει
+
+        self.guessed.add(letter)  # Προσθέτει το φωνήεν στα “βρεμένα”
+        if all_revealed(self.word, self.guessed):  # Αν ολοκληρώθηκε η λέξη
+            p["score"] += WIN_BONUS  # Bonus
+            self.message = f"BRAVO! The word was: {self.word} (+{WIN_BONUS} bonus). End of round! (N)"  # Μήνυμα νίκης
+            self.phase = "END"  # Τέλος γύρου
+            return  # Τερματίζει
+
+        self.message = f"There are {count} {letter}(s)! (purchase -{VOWEL_COST}). Continue!"  # Μήνυμα συνέχειας
+
+    def start_solve(self):  # Ξεκινά κατάσταση “γράφω λύση”
+        if self.phase != "ACTION":  # Αν δεν είμαστε σε ACTION
+            return  # Δεν επιτρέπεται
+        self.solve_mode = True  # Ενεργοποιεί solve mode
+        self.solve_text = ""  # Καθαρίζει κείμενο λύσης
+        self.await_vowel = False  # Σταματά αναμονή φωνήεντος
+        self.message = "Type the solution and press ENTER (ESC to cancel)."  # Μήνυμα οδηγίας
+
+    def submit_solve(self):  # Υποβάλλει λύση που πληκτρολόγησε ο παίκτης
+        if not self.solve_mode:  # Αν δεν είμαστε σε solve mode
+            return  # Δεν κάνουμε τίποτα
+        attempt = self.solve_text.strip().upper().replace(" ", "")  # Καθαρίζει κενά και κάνει κεφαλαία
+        target = self.word.replace(" ", "")  # Στόχος λέξης χωρίς κενά
+        self.solve_mode = False  # Βγαίνει από solve mode
+        if attempt == target:  # Αν η λύση είναι σωστή
+            self.current_player()["score"] += WIN_BONUS  # Bonus
+            self.message = f"BRAVO! The word was: {self.word} (+{WIN_BONUS} bonus). End of round! (N)"  # Μήνυμα
+            self.phase = "END"  # Τέλος γύρου
+        else:  # Αν είναι λάθος
+            self.message = f"WRONG! The correct word was: {self.word}. Next player."  # Μήνυμα
+            self.next_turn()  # Επόμενος παίκτης
+
+    def cancel_solve(self):  # Ακυρώνει το solve mode
+        if self.solve_mode:  # Αν είμαστε σε solve mode
+            self.solve_mode = False  # Το απενεργοποιεί
+            self.solve_text = ""  # Καθαρίζει κείμενο
+            self.message = "Solve cancelled. Continue with a letter or press ENTER to solve."  # Μήνυμα
+
+    def reset_round(self):  # Ξεκινά νέο γύρο με νέα λέξη
+        self.word = random.choice(WORDS)  # Νέα τυχαία λέξη
+        self.guessed = set()  # Καθαρίζει βρεμένα γράμματα
+        self.used_letters = set()  # Καθαρίζει χρησιμοποιημένα γράμματα
+        self.phase = "SPIN"  # Πάει στην αρχική φάση SPIN
+        self.last_spin = None  # Καθαρίζει last spin
+        self.solve_mode = False  # Off solve mode
+        self.solve_text = ""  # Καθαρίζει λύση
+        self.await_vowel = False  # Off αναμονή φωνήεντος
+        self.message = f"New round! It's {self.current_player()['name']}'s turn — press SPACE to SPIN."  # Μήνυμα νέου γύρου
+
+def main():  # Η κύρια συνάρτηση που στήνει το παιχνίδι και τρέχει το loop
+    pygame.init()  # Αρχικοποιεί pygame (πρέπει να γίνει πριν χρησιμοποιήσουμε pygame features)
+    pygame.display.set_caption("Christmas Wheel 2060")  # Τίτλος παραθύρου
+    info = pygame.display.Info()  # Παίρνει πληροφορίες οθόνης (ανάλυση)
+    WIDTH, HEIGHT = info.current_w, info.current_h  # Πλάτος/ύψος οθόνης
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.NOFRAME)  # Παράθυρο full screen χωρίς πλαίσιο
+
+    try:  # Προσπαθεί να φορτώσει το background
+        bg_image = pygame.image.load(BG_PATH).convert()  # Φορτώνει εικόνα και τη μετατρέπει για γρήγορο blit
+    except Exception as e:  # Αν αποτύχει
+        print("Could not load image:", BG_PATH)  # Εκτυπώνει μήνυμα
+        print("Error:", e)  # Εκτυπώνει το error
+        pygame.quit()  # Κλείνει pygame
+        return  # Βγαίνει από main
+
+    bg_image = pygame.transform.smoothscale(bg_image, (WIDTH, HEIGHT))  # Κάνει scale το background ώστε να γεμίσει την οθόνη
+
+    final_image = None  # Αρχικά δεν έχουμε τελική εικόνα
+    try:  # Προσπαθεί να φορτώσει την τελική εικόνα
+        final_image = pygame.image.load(FINAL_IMAGE_PATH).convert_alpha()  # Φορτώνει με alpha
+    except Exception as e:  # Αν αποτύχει
+        print("Could not load final image:", FINAL_IMAGE_PATH)  # Μήνυμα
+        print("Error:", e)  # Error
+        final_image = None  # Μένει None
+
+    clock = pygame.time.Clock()  # Ρολόι για FPS
+
+    try:  # Προσπαθεί να αρχικοποιήσει τον mixer για ήχο
+        pygame.mixer.init()  # Mixer init
+    except Exception as e:  # Αν αποτύχει
+        print(" Could not start sound mixer.", e)  # Προειδοποίηση
+
+    spin_sound = None  # Μεταβλητή ήχου
+    spin_channel = None  # Μεταβλητή channel
+
+    try:  # Προσπάθεια φόρτωσης ήχου
+        if os.path.exists(SPIN_SOUND_PATH):  # Αν υπάρχει το αρχείο ήχου
+            spin_sound = pygame.mixer.Sound(SPIN_SOUND_PATH)  # Φορτώνει τον ήχο
+            spin_sound.set_volume(0.55)  # Ρυθμίζει ένταση (0..1)
+        else:  # Αν δεν υπάρχει
+            print("Sound file not found:", SPIN_SOUND_PATH)  # Μήνυμα
+    except Exception as e:  # Αν υπάρχει σφάλμα φόρτωσης ήχου
+        print(" Could not load sound:", e)  # Μήνυμα σφάλματος
+
+    font_title = pygame.font.SysFont("Segoe UI", 56, bold=True)  # Γραμματοσειρά τίτλου
+    font_players = pygame.font.SysFont("Segoe UI", 26, bold=True)  # Γραμματοσειρά παικτών
+    font_players_turn = pygame.font.SysFont("Segoe UI", 30, bold=True)  # Γραμματοσειρά για τον παίκτη που παίζει τώρα
+    font_header = pygame.font.SysFont("Segoe UI", 34, bold=True)  # Γραμματοσειρά headers
+    font_header_small = pygame.font.SysFont("Segoe UI", 28, bold=True)  # Μικρό header
+    font_med = pygame.font.SysFont("Segoe UI", 22, bold=True)  # Μεσαίο κείμενο
+    font_small = pygame.font.SysFont("Segoe UI", 18, bold=True)  # Μικρό κείμενο
+    font_wheel = pygame.font.SysFont("Segoe UI", 18, bold=True)  # Κείμενο πάνω στις φέτες
+
+    wheel_radius = 260  # Ακτίνα τροχού
+    wheel_surf_size = wheel_radius * 2 + 40  # Μέγεθος surface τροχού (λίγο μεγαλύτερο για περιθώριο)
+    wheel_base = pygame.Surface((wheel_surf_size, wheel_surf_size), pygame.SRCALPHA)  # Surface για στατικό σχέδιο τροχού
+    wc = wheel_surf_size // 2  # Κέντρο τροχού μέσα στο surface
+
+    n_slices = len(WHEEL_SLICES)  # Πλήθος φετών
+    slice_angle = 2 * math.pi / n_slices  # Γωνία κάθε φέτας σε radians
+
+    SNOW_PALETTE = [  # Παλέτα χρωμάτων “neon χιονιού”
+        (30, 255, 200),  # neon πρασινοκυανό
+        (90, 200, 255),  # neon γαλάζιο
+        (255, 220, 90),  # neon χρυσοκίτρινο
+        (200, 120, 255),  # neon μωβ
+        (90, 200, 255),  # επανάληψη για ρυθμό
+        (60, 110, 225),  # πιο βαθύ μπλε
+    ]
+
+    def tint(col, k):  # Συνάρτηση που “φωτίζει” ή “σκουραίνει” ένα χρώμα
+        return (  # Επιστρέφει νέο RGB
+            max(0, min(255, int(col[0] * k))),  # Clamp του R στο 0..255
+            max(0, min(255, int(col[1] * k))),  # Clamp του G
+            max(0, min(255, int(col[2] * k))),  # Clamp του B
+        )
+
+    slice_colors = []  # Λίστα τελικών χρωμάτων φετών
+    for i in range(n_slices):  # Για κάθε φέτα
+        base = SNOW_PALETTE[i % len(SNOW_PALETTE)]  # Παίρνει χρώμα από την παλέτα κυκλικά
+        light_factor = 1.25 if i % 2 == 0 else 0.90  # Εναλλάσσει φωτεινότητα για πιο “ζωντανό” αποτέλεσμα
+        col = tint(base, light_factor)  # Εφαρμόζει το factor
+        slice_colors.append(col)  # Προσθέτει το χρώμα στη λίστα
+
+    def render_wheel():  # Φτιάχνει/ζωγραφίζει τον στατικό τροχό πάνω στο wheel_base
+        wheel_base.fill((0, 0, 0, 0))  # Καθαρίζει το surface (διαφανές)
+        for i, (label, _) in enumerate(WHEEL_SLICES):  # Για κάθε φέτα
+            start = i * slice_angle  # Αρχική γωνία φέτας
+            end = start + slice_angle  # Τελική γωνία φέτας
+            pts = [(wc, wc)]  # Πρώτο σημείο: κέντρο τροχού
+            steps = 30  # Πόσα “κομματάκια” θα χρησιμοποιήσουμε για το τόξο (ομαλότητα)
+            for s in range(steps + 1):  # Για κάθε βήμα στο τόξο
+                a = start + (end - start) * (s / steps)  # Γωνία σε αυτό το βήμα
+                x = wc + math.cos(a) * wheel_radius  # x πάνω στον κύκλο
+                y = wc + math.sin(a) * wheel_radius  # y πάνω στον κύκλο
+                pts.append((x, y))  # Προσθέτει σημείο στο πολύγωνο
+            pygame.draw.polygon(wheel_base, slice_colors[i], pts)  # Ζωγραφίζει τη φέτα με το χρώμα της
+
+            shade = pygame.Surface((wheel_surf_size, wheel_surf_size), pygame.SRCALPHA)  # Surface σκίασης
+            pygame.draw.polygon(shade, (0, 0, 0, 55), pts)  # Σκούρα σκιά με διαφάνεια
+            pygame.draw.polygon(shade, (255, 255, 255, 25), pts, 1)  # Λίγο φωτεινό περίγραμμα
+            wheel_base.blit(shade, (0, 0))  # Ενώνει τη σκίαση πάνω στον τροχό
+
+            pygame.draw.polygon(wheel_base, (15, 15, 15), pts, 2)  # Σκούρο outline φέτας
+
+            mid = start + slice_angle / 2  # Μέση γωνία φέτας (για τοποθέτηση κειμένου)
+            tx = wc + math.cos(mid) * (wheel_radius * 0.62)  # x κειμένου
+            ty = wc + math.sin(mid) * (wheel_radius * 0.62)  # y κειμένου
+            rect = font_wheel.render(label, True, GOLD).get_rect(center=(tx, ty))  # Rect κειμένου κεντραρισμένο
+            draw_gold_text(wheel_base, label, font_wheel, rect.x, rect.y, GOLD)  # Ζωγραφίζει το label “χρυσό”
+
+        pygame.draw.circle(wheel_base, (10, 10, 10), (wc, wc), wheel_radius, 6)  # Εξωτερικό περίγραμμα τροχού
+
+    render_wheel()  # Καλεί τη συνάρτηση για να δημιουργηθεί ο τροχός μία φορά
+
+    cached_deg = None  # Αποθηκεύει την τελευταία περιστροφή σε μοίρες (cache)
+    cached_img = None  # Αποθηκεύει την τελευταία rotated εικόνα (cache)
+
+    def get_wheel_image(rotation):  # Επιστρέφει εικόνα τροχού περιστραμμένη (με caching)
+        nonlocal cached_deg, cached_img  # Χρησιμοποιεί τις εξωτερικές μεταβλητές cache
+        deg = -math.degrees(rotation)  # Μετατρέπει radians σε μοίρες και αλλάζει πρόσημο για σωστή φορά
+        qdeg = int(round(deg / 2) * 2)  # Στρογγυλοποιεί ανά 2 μοίρες για λιγότερα rotate
+        if cached_img is None or qdeg != cached_deg:  # Αν δεν έχουμε cache ή άλλαξε η γωνία
+            cached_deg = qdeg  # Ενημερώνει την cached γωνία
+            cached_img = pygame.transform.rotate(wheel_base, qdeg)  # Περιστρέφει το wheel_base
+        return cached_img  # Επιστρέφει την cached εικόνα
+
+    glow_outer = make_glow_circle(wheel_radius + 80, NEON_CYAN, strength=120)  # Glow έξω από τον τροχό
+    glow_inner = make_glow_circle(wheel_radius + 40, NEON_PURPLE, strength=110)  # Glow πιο κοντά στον τροχό
+
+    CENTER_X = WIDTH // 2  # Κέντρο οθόνης στον x
+    cx = (WIDTH // 2) - 60  # Κέντρο τροχού στον x (λίγο αριστερά)
+    cy = (HEIGHT // 2) + 40  # Κέντρο τροχού στον y (λίγο πιο κάτω)
+    pointer_y = cy - wheel_radius - 18  # y θέση του δείκτη (πάνω από τον τροχό)
+
+    btn_w = 220  # Πλάτος κουμπιών
+    btn_h = 52  # Ύψος κουμπιών
+    btn_gap = 13  # Κενό ανάμεσα στα κουμπιά
+    total_h = btn_h * 3 + btn_gap * 2  # Συνολικό ύψος τριάδας κουμπιών
+    start_y = (HEIGHT // 2) - (total_h // 2) - 175  # Y αρχής κουμπιών αριστερά
+    left_x = 170  # X θέση κουμπιών αριστερά
+
+    btn_spin = pygame.Rect(left_x, start_y, btn_w, btn_h)  # Rect κουμπιού SPIN
+    btn_vowel = pygame.Rect(left_x, start_y + (btn_h + btn_gap), btn_w, btn_h)  # Rect κουμπιού VOWEL
+    btn_new_round = pygame.Rect(left_x, start_y + 2 * (btn_h + btn_gap), btn_w, btn_h)  # Rect κουμπιού NEW ROUND
+
+    btn_exit = pygame.Rect(WIDTH - 60, 20, 40, 40)  # Rect κουμπιού εξόδου πάνω δεξιά
+
+    right_margin = 40  # Περιθώριο δεξιά
+    right_w = max(360, int(WIDTH * 0.32))  # Πλάτος δεξιού panel (min 360 ή 32% οθόνης)
+    right_x = WIDTH - right_w - right_margin  # x θέση δεξιών panels
+    base_y = int(HEIGHT * 0.20)  # y βάση δεξιού panel
+
+    players_panel = pygame.Rect(right_x, base_y, right_w, 260)  # Panel παικτών
+    word_panel = pygame.Rect(right_x, players_panel.bottom + 18, right_w, 175)  # Panel λέξης
+    used_panel = pygame.Rect(right_x, word_panel.bottom + 14, right_w, 110)  # Panel χρησιμοποιημένων γραμμάτων
+
+    msg_panel_width = WIDTH // 2  # Πλάτος panel μηνύματος κάτω
+    msg_panel_x = (WIDTH - msg_panel_width) // 2  # Κεντράρισμα panel μηνύματος
+    msg_panel = pygame.Rect(msg_panel_x, HEIGHT - 70, msg_panel_width, 45)  # Rect panel μηνύματος
+
+    snow_count = int((WIDTH * HEIGHT) / (1920 * 1080) * 220)  # Υπολογίζει νιφάδες ανάλογα με ανάλυση
+    snow_count = max(140, min(320, snow_count))  # Περιορίζει το πλήθος 140..320
+    snowflakes = [Snowflake(WIDTH, HEIGHT) for _ in range(snow_count)]  # Δημιουργεί τη λίστα νιφάδων
+
+    wind = 0.0  # Μεταβλητή “αέρα” για drift του χιονιού
+    finish_mode = False  # Αν είμαστε σε οθόνη τέλους
+    finish_timer = 0.0  # Χρόνος που μετράει στο τέλος
+    finish_show_image = False  # Αν θα δείξουμε τελική εικόνα
+
+    game = Game()  # Δημιουργεί το αντικείμενο Game
+    game.set_sound(spin_sound, spin_channel)  # Περνάει τον ήχο στο Game
+
+    t = 0.0  # Χρόνος για animations (neon κ.λπ.)
+    running = True  # Σημαία για το κύριο loop
+
+    while running:  # Κύριος βρόχος παιχνιδιού (τρέχει μέχρι να βγει)
+        dt = clock.tick(FPS) / 1000.0  # Πόσος χρόνος πέρασε σε δευτερόλεπτα (σταθερή συμπεριφορά)
+        t += dt  # Αυξάνει τον συνολικό χρόνο animation
+
+        if not finish_mode:  # Αν δεν είμαστε σε τέλος
+            game.update(dt)  # Ενημερώνει το Game (π.χ. περιστροφή τροχού)
+
+        wind = 40 * math.sin(t * 0.35)  # Υπολογίζει “αέρα” που αλλάζει ομαλά με ημίτονο
+        for flake in snowflakes:  # Για κάθε νιφάδα
+            flake.update(dt, WIDTH, HEIGHT, wind)  # Ενημερώνει τη θέση της
+
+        if finish_mode:  # Αν είμαστε σε τέλος
+            finish_timer += dt  # Μετράει χρόνο
+            if finish_timer >= 7.0:  # Μετά από 7 δευτερόλεπτα
+                finish_show_image = True  # Ενεργοποιεί εμφάνιση τελικής εικόνας
+
+        mx, my = pygame.mouse.get_pos()  # Παίρνει θέση ποντικιού
+        exit_hover = btn_exit.collidepoint(mx, my)  # Ελέγχει αν το ποντίκι είναι πάνω στο κουμπί εξόδου
+
+        for event in pygame.event.get():  # Παίρνει όλα τα events από το pygame
+            if event.type == pygame.QUIT:  # Αν κλείσει το παράθυρο
+                running = False  # Σταματά το loop
+
+            if event.type == pygame.KEYDOWN:  # Αν πατήθηκε πλήκτρο
+                if finish_mode:  # Αν είμαστε σε οθόνη τέλους
+                    if event.key in (pygame.K_SPACE, pygame.K_ESCAPE):  # Αν πατήθηκε SPACE ή ESC
+                        finish_mode = False  # Βγαίνει από τέλος
+                        game.reset_round()  # Ξεκινά νέο γύρο
+                    continue  # Πάει στο επόμενο event
+
+                if event.key == pygame.K_ESCAPE:  # Αν πατήθηκε ESC
+                    if game.solve_mode:  # Και είμαστε σε solve mode
+                        game.cancel_solve()  # Ακυρώνει τη λύση
+
+                if event.key == pygame.K_SPACE:  # Αν πατήθηκε SPACE
+                    if game.phase == "SPIN" and not game.spinning:  # Αν είναι η φάση SPIN και δεν γυρίζει ήδη
+                        game.start_spin()  # Ξεκινάει το spin
+
+                if event.key == pygame.K_n and game.phase == "END":  # Αν πατήθηκε N και είμαστε στο END
+                    finish_mode = True  # Ενεργοποιεί οθόνη τέλους
+                    finish_timer = 0.0  # Μηδενίζει timer
+                    finish_show_image = False  # Δεν δείχνει ακόμα εικόνα
+
+                if game.phase == "ACTION":  # Αν είμαστε σε φάση δράσης
+                    if event.key == pygame.K_RETURN:  # Αν πατήθηκε ENTER
+                        if not game.solve_mode:  # Αν δεν γράφει λύση
+                            game.start_solve()  # Ξεκινά να γράφει λύση
+                        else:  # Αν ήδη γράφει λύση
+                            game.submit_solve()  # Υποβάλλει λύση
+
+                    if event.key == pygame.K_v:  # Αν πατήθηκε V
+                        game.buy_vowel()  # Αγοράζει φωνήεν
+
+                    if game.await_vowel:  # Αν περιμένουμε φωνήεν
+                        ch = event.unicode.upper()  # Παίρνει τον χαρακτήρα και τον κάνει κεφαλαίο
+                        if ch and ch.isalpha():  # Αν υπάρχει και είναι γράμμα
+                            game.guess_vowel(ch)  # Δίνει το φωνήεν
+                        continue  # Δεν συνεχίζει σε άλλα χειριστήρια
+
+                    if game.solve_mode:  # Αν γράφουμε λύση
+                        if event.key == pygame.K_BACKSPACE:  # Αν πατήθηκε backspace
+                            game.solve_text = game.solve_text[:-1]  # Σβήνει τον τελευταίο χαρακτήρα
+                        else:  # Αν είναι άλλο πλήκτρο
+                            ch = event.unicode  # Παίρνει τον χαρακτήρα
+                            if ch and (ch.isalpha() or ch == " "):  # Αν είναι γράμμα ή κενό
+                                game.solve_text += ch.upper()  # Προσθέτει στο solve text
+                        continue  # Δεν πάει σε guess_letter
+
+                    ch = event.unicode.upper()  # Παίρνει χαρακτήρα για μάντεμα γράμματος
+                    if ch and ch.isalpha():  # Αν είναι γράμμα
+                        game.guess_letter(ch)  # Προσπαθεί να μαντέψει (σύμφωνο)
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Αν έγινε αριστερό κλικ
+                mx, my = event.pos  # Θέση κλικ
+                if btn_exit.collidepoint(mx, my):  # Αν κλικ στο exit
+                    running = False  # Κλείνει παιχνίδι
+                if finish_mode:  # Αν είμαστε σε τέλος
+                    continue  # Αγνοεί άλλα κουμπιά
+                if btn_spin.collidepoint(mx, my):  # Αν κλικ στο SPIN
+                    if game.phase == "SPIN" and not game.spinning:  # Αν επιτρέπεται spin
+                        game.start_spin()  # Ξεκινά spin
+                if btn_vowel.collidepoint(mx, my):  # Αν κλικ στο VOWEL
+                    if game.phase == "ACTION" and not game.spinning:  # Αν επιτρέπεται
+                        game.buy_vowel()  # Αγορά φωνήεντος
+                if btn_new_round.collidepoint(mx, my):  # Αν κλικ στο NEW ROUND
+                    pass  # (Εδώ δεν γίνεται κάτι γιατί NEW ROUND γίνεται με N στο END)
+
+        screen.blit(bg_image, (0, 0))  # Ζωγραφίζει το φόντο
+
+        for flake in snowflakes:  # Για κάθε νιφάδα
+            flake.draw(screen)  # Ζωγραφίζει τη νιφάδα
+
+        if finish_mode:  # Αν είμαστε σε οθόνη τέλους
+            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)  # Φτιάχνει ένα overlay με alpha
+            overlay.fill((0, 0, 0, 160))  # Μαύρο διάφανο
+            screen.blit(overlay, (0, 0))  # Το ζωγραφίζει πάνω απ’ όλα
+
+            if not finish_show_image:  # Αν δεν δείχνουμε ακόμα την τελική εικόνα
+                box_w = int(WIDTH * 0.70)  # Πλάτος κουτιού
+                box_h = 160  # Ύψος κουτιού
+                box = pygame.Rect((WIDTH - box_w) // 2, (HEIGHT - box_h) // 2, box_w, box_h)  # Rect κουτιού κεντραρισμένο
+                pygame.draw.rect(screen, (20, 20, 20), box, border_radius=22)  # Σκούρο κουτί
+                col = neon_cycle_color(t, speed=1.1)  # Neon χρώμα για outline
+                pulse = 0.5 + 0.5 * math.sin(t * 6.0)  # Γρήγορος παλμός
+                bw = 4 + int(3 * pulse)  # Πάχος border που αλλάζει
+                pygame.draw.rect(screen, col, box, bw, border_radius=22)  # Neon outline
+                draw_neon_text_center(screen, "< ALGORITHMICS FOR EVER >", font_title, WIDTH // 2, HEIGHT // 2, t)  # Neon μήνυμα
+                winner = max(game.players, key=lambda p: p["score"])  # Βρίσκει νικητή με μέγιστο σκορ
+                draw_gold_text_center(screen, f"WINNER: {winner['name']}!", font_header, WIDTH // 2, HEIGHT // 2 + 62, GOLD)  # Δείχνει νικητή
+            else:  # Αν πρέπει να δείξουμε τελική εικόνα
+                if final_image:  # Αν υπάρχει τελική εικόνα φορτωμένη
+                    iw, ih = final_image.get_size()  # Παίρνει μέγεθος εικόνας
+                    scale = min(WIDTH / iw, HEIGHT / ih)  # Υπολογίζει scale για να χωρέσει
+                    nw, nh = int(iw * scale), int(ih * scale)  # Νέο μέγεθος
+                    img = pygame.transform.smoothscale(final_image, (nw, nh))  # Κάνει ομαλό scale
+                    screen.blit(img, img.get_rect(center=(WIDTH // 2, HEIGHT // 2)))  # Ζωγραφίζει στο κέντρο
+                else:  # Αν δεν υπάρχει τελική εικόνα
+                    draw_gold_text_center(screen, "Final image not found!", font_title, WIDTH // 2, HEIGHT // 2, GOLD)  # Μήνυμα λάθους
+                draw_gold_text_center(screen, "Press SPACE for a new round", font_med, WIDTH // 2, HEIGHT - 70, GOLD)  # Οδηγία
+            pygame.display.flip()  # Ενημερώνει την οθόνη
+            continue  # Πάει στο επόμενο frame
+
+        draw_exit_button(screen, btn_exit, font_med, hover=exit_hover)  # Ζωγραφίζει κουμπί εξόδου
+        draw_neon_text_center(screen, "THE CHRISTMAS WHEEL 2060", font_title, CENTER_X, 36, t)  # Ζωγραφίζει neon τίτλο
+
+        spin_enabled = (game.phase == "SPIN" and not game.spinning)  # Αν επιτρέπεται spin
+        vowel_enabled = (game.phase == "ACTION" and not game.spinning and not game.solve_mode)  # Αν επιτρέπεται αγορά φωνήεντος
+        new_enabled = (game.phase == "END")  # Αν επιτρέπεται NEW ROUND
+
+        draw_image_button(screen, bg_image, btn_spin, "SPIN (SPACE)", font_med, enabled=spin_enabled)  # Ζωγραφίζει κουμπί SPIN
+        draw_image_button(screen, bg_image, btn_vowel, f"VOWEL (V) -{VOWEL_COST}", font_med, enabled=vowel_enabled)  # Ζωγραφίζει κουμπί VOWEL
+        draw_image_button(screen, bg_image, btn_new_round, "NEW ROUND (N)", font_med, enabled=new_enabled)  # Ζωγραφίζει κουμπί NEW ROUND
+
+        ppointer = [(cx, pointer_y), (cx - 18, pointer_y + 34), (cx + 18, pointer_y + 34)]  # Σημεία τριγώνου δείκτη
+        pygame.draw.polygon(screen, (255, 90, 90), ppointer)  # Γεμίζει τον δείκτη κόκκινο
+        pygame.draw.polygon(screen, (255, 255, 255), ppointer, 1)  # Άσπρο περίγραμμα δείκτη
+
+        pg = pygame.Surface((60, 60), pygame.SRCALPHA)  # Μικρό surface για κύκλο γύρω από τον δείκτη
+        pygame.draw.circle(pg, (*NEON_CYAN, 55), (30, 30), 22, 3)  # Neon κύκλος
+        screen.blit(pg, (cx - 30, pointer_y + 8))  # Τοποθετεί κοντά στο δείκτη
+
+        pulse = 0.5 + 0.5 * math.sin(t * 2.0)  # Παλμός glow γύρω από τροχό
+        a_outer = int(80 + 70 * pulse)  # Alpha εξωτερικού glow
+        a_inner = int(70 + 60 * (1 - pulse))  # Alpha εσωτερικού glow
+        g1 = glow_outer.copy()  # Αντιγράφει glow_outer
+        g2 = glow_inner.copy()  # Αντιγράφει glow_inner
+        g1.set_alpha(a_outer)  # Θέτει διαφάνεια
+        g2.set_alpha(a_inner)  # Θέτει διαφάνεια
+        r1 = g1.get_rect(center=(cx, cy))  # Rect glow_outer κεντραρισμένο
+        r2 = g2.get_rect(center=(cx, cy))  # Rect glow_inner κεντραρισμένο
+        screen.blit(g1, r1.topleft)  # Ζωγραφίζει glow_outer
+        screen.blit(g2, r2.topleft)  # Ζωγραφίζει glow_inner
+
+        draw_neon_ring(screen, (cx, cy), wheel_radius, t)  # Ζωγραφίζει neon ring γύρω από τον τροχό
+        draw_sparkles(screen, (cx, cy), wheel_radius, t, count=16)  # Ζωγραφίζει sparkles
+
+        wheel_img = get_wheel_image(game.rotation)  # Παίρνει την περιστραμμένη εικόνα τροχού
+        wheel_rect = wheel_img.get_rect(center=(cx, cy))  # Rect τροχού κεντραρισμένο
+        screen.blit(wheel_img, wheel_rect)  # Ζωγραφίζει τον τροχό
+
+        hub_col = neon_cycle_color(t, speed=1.2)  # Neon χρώμα κέντρου τροχού
+        hub_pulse = 0.5 + 0.5 * math.sin(t * 6.0)  # Γρήγορος παλμός κέντρου
+        hub_r = int(14 + 3 * hub_pulse)  # Ακτίνα κέντρου που “αναπνέει”
+        hub_glow_r = int(34 + 10 * hub_pulse)  # Ακτίνα glow κέντρου
+        hub_glow = pygame.Surface((hub_glow_r * 2 + 2, hub_glow_r * 2 + 2), pygame.SRCALPHA)  # Surface glow κέντρου
+        pygame.draw.circle(hub_glow, (*hub_col, int(70 + 120 * hub_pulse)), (hub_glow_r + 1, hub_glow_r + 1), hub_glow_r)  # Glow κύκλος
+        pygame.draw.circle(hub_glow, (*hub_col, int(40 + 80 * (1 - hub_pulse))), (hub_glow_r + 1, hub_glow_r + 1), hub_glow_r - 10, 3)  # Outline glow
+        screen.blit(hub_glow, hub_glow.get_rect(center=(cx, cy)).topleft)  # Ζωγραφίζει glow στο κέντρο
+        pygame.draw.circle(screen, hub_col, (cx, cy), hub_r)  # Ζωγραφίζει τον κεντρικό κύκλο
+        pygame.draw.circle(screen, (10, 10, 10), (cx, cy), hub_r, 2)  # Περίγραμμα κέντρου
+
+        draw_image_panel(screen, bg_image, players_panel, alpha=130, radius=18)  # Panel παικτών
+        draw_image_panel(screen, bg_image, word_panel, alpha=130, radius=18)  # Panel λέξης
+        draw_image_panel(screen, bg_image, used_panel, alpha=130, radius=18)  # Panel used letters
+        draw_image_panel(screen, bg_image, msg_panel, alpha=140, radius=18)  # Panel μηνύματος
+
+        draw_gold_text_center(screen, "WORD", font_header, word_panel.centerx, word_panel.y + 34, GOLD)  # Τίτλος λέξης
+        masked = mask_word(game.word, game.guessed)  # Φτιάχνει την κρυμμένη λέξη
+        draw_gold_text_center(screen, masked, font_players_turn, word_panel.centerx, word_panel.y + 105, GOLD)  # Δείχνει την κρυμμένη λέξη
+
+        if game.solve_mode:  # Αν ο παίκτης γράφει λύση
+            solve_panel = pygame.Rect(word_panel.x + 12, word_panel.bottom - 80, word_panel.w - 24, 65)  # Panel λύσης μέσα στο word panel
+            draw_image_panel(screen, bg_image, solve_panel, alpha=150, radius=14)  # Ζωγραφίζει panel λύσης
+            draw_gold_text(screen, "SOLUTION:", font_med, solve_panel.x + 12, solve_panel.y + 8, GOLD)  # Ετικέτα SOLUTION
+            draw_gold_text(screen, game.solve_text, font_med, solve_panel.x + 12, solve_panel.y + 34, GOLD)  # Το κείμενο που γράφει
+
+        draw_gold_text_center(screen, "PLAYER : POINTS", font_header, players_panel.centerx, players_panel.y + 34, GOLD)  # Τίτλος παικτών
+        y = players_panel.y + 78  # Αρχικό y για λίστα παικτών
+        for i, p in enumerate(game.players):  # Για κάθε παίκτη
+            is_turn = (i == game.turn and game.phase != "END")  # Αν είναι η σειρά του
+            prefix = "➡ " if is_turn else "   "  # Βέλος αν παίζει
+            line = f"{prefix}{p['name']}: {p['score']} points"  # Κείμενο παίκτη
+            draw_gold_text(screen, line, font_players_turn if is_turn else font_players, players_panel.x + 16, y, GOLD)  # Ζωγραφίζει γραμμή
+            y += 56  # Κατεβαίνει για τον επόμενο παίκτη
+
+        draw_gold_text_center(screen, "USED LETTERS", font_header_small, used_panel.centerx, used_panel.y + 24, GOLD)  # Τίτλος used letters
+        lines = wrap_letters(game.used_letters, max_per_line=18)  # Σπάει used letters σε γραμμές
+        yy = used_panel.y + 52  # Αρχικό y για used letters
+        for line in lines[:2]:  # Δείχνει έως 2 γραμμές
+            draw_gold_text(screen, line if line else "-", font_small, used_panel.x + 14, yy, GOLD)  # Ζωγραφίζει τη γραμμή
+            yy += 26  # Πηγαίνει στην επόμενη
+
+        draw_gold_text_center(screen, game.message, font_med, msg_panel.centerx, msg_panel.centery)  # Ζωγραφίζει το μήνυμα παιχνιδιού
+
+        for flake in snowflakes[: max(20, snow_count // 8)]:  # Μερικές έξτρα νιφάδες “πάνω από όλα” για βάθος
+            pygame.draw.circle(screen, (*SNOW_WHITE, 200), (int(flake.x), int(flake.y)), int(flake.r + 1))  # Ζωγραφίζει μεγαλύτερη νιφάδα
+
+        pygame.display.flip()  # Ενημερώνει το παράθυρο με όλα όσα ζωγραφίστηκαν
+
+    pygame.quit()  # Κλείνει σωστά το pygame όταν βγούμε από το loop
+
+if __name__ == "__main__":  # Αν τρέχει το αρχείο απευθείας (όχι import)
+    main()  # Καλεί την main για να ξεκινήσει το παιχνίδι
